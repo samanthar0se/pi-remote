@@ -51,7 +51,7 @@ pi
 # pi --plan
 ```
 
-The extension refuses to listen when `PI_REMOTE_TOKEN` is empty. `PLANNOTATOR_REMOTE=1` makes Plannotator bind its transient UI to the LAN; it does not try to open a browser on the remote machine.
+The extension refuses to listen when `PI_REMOTE_TOKEN` is empty. Run `/pi-remote-token` inside Pi to display the token configured for the current process. `PLANNOTATOR_REMOTE=1` makes Plannotator bind its transient UI to the LAN; it does not try to open a browser on the remote machine.
 
 Allow only your local subnet through the firewall. Example with UFW:
 

@@ -34,6 +34,17 @@ function tokenMatches(candidate: string): boolean {
 }
 
 export default function piRemote(pi: ExtensionAPI): void {
+  pi.registerCommand("pi-remote-token", {
+    description: "Show the pre-shared token used by Pi Remote",
+    handler: async (_args, ctx) => {
+      if (!TOKEN) {
+        ctx.ui.notify("Pi Remote token is not configured. Set PI_REMOTE_TOKEN before starting Pi.", "warning");
+        return;
+      }
+      ctx.ui.notify(`PI_REMOTE_TOKEN=${TOKEN}`, "info");
+    },
+  });
+
   let latestCtx: ExtensionContext | null = null;
   let server: HttpServer | null = null;
   let wss: WebSocketServer | null = null;
