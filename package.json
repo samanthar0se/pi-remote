@@ -3,10 +3,10 @@
   "private": true,
   "packageManager": "pnpm@10.14.0",
   "scripts": {
-    "dev": "pnpm --filter @pi-remote/desktop dev",
-    "tauri": "pnpm --filter @pi-remote/desktop tauri",
-    "build": "pnpm -r build",
-    "typecheck": "pnpm -r typecheck",
+    "dev": "corepack pnpm --filter @pi-remote/desktop dev",
+    "tauri": "corepack pnpm --filter @pi-remote/desktop tauri",
+    "build": "corepack pnpm -r build",
+    "typecheck": "corepack pnpm -r typecheck",
     "test": "vitest run"
   },
   "devDependencies": {

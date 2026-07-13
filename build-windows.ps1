@@ -134,7 +134,9 @@ if (-not $SkipTests) {
     Invoke-Checked "corepack" "pnpm" "test"
 
     Write-Step "Type-checking all packages"
-    Invoke-Checked "corepack" "pnpm" "typecheck"
+    # Call the recursive command directly so the build never relies on a
+    # globally installed pnpm shim, which fresh Corepack setups may not expose.
+    Invoke-Checked "corepack" "pnpm" "-r" "typecheck"
 }
 
 Write-Step "Building the Windows NSIS executable"
