@@ -96,6 +96,17 @@ pnpm tauri dev           # native development window
 
 The browser-only UI falls back to `localStorage` for connection settings. A Tauri build uses the Store plugin.
 
+## Run the Windows app during development
+
+After pulling changes, launch the current source directly in a native Tauri window:
+
+```powershell
+git pull
+powershell -ExecutionPolicy Bypass -File .\run-windows.ps1
+```
+
+This skips tests, installers, and release packaging. Rust dependencies remain cached, Vite serves the current frontend directly, and the window reloads as UI files change. Stop it with `Ctrl+C`.
+
 ## Build the Windows executable on another computer
 
 Clone the repository, open PowerShell in its root, and run:
@@ -104,7 +115,7 @@ Clone the repository, open PowerShell in its root, and run:
 powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 ```
 
-The script checks prerequisites, installs locked JavaScript dependencies, runs tests and type-checking, removes all cached release output so fresh frontend assets are embedded, then copies both the portable application and Tauri NSIS installer into `artifacts\`. The portable file is named `Pi-Remote-portable.exe` and can be run without installation.
+The script checks prerequisites, installs locked JavaScript dependencies, runs tests and type-checking, rebuilds the desktop package while preserving Rust dependency caches, then copies both the portable application and Tauri NSIS installer into `artifacts\`. The portable file is named `Pi-Remote-portable.exe` and can be run without installation.
 
 On a new Windows development machine, open PowerShell as Administrator and allow the script to install missing Node.js, Rust, and Visual C++ Build Tools through `winget`:
 

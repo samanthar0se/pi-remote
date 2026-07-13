@@ -140,8 +140,10 @@ if (-not $SkipTests) {
     Invoke-Checked "corepack" "pnpm" "-r" "typecheck"
 }
 
-Write-Step "Removing all cached release output"
-Invoke-Checked "cargo" "clean" "--manifest-path" "apps\desktop\src-tauri\Cargo.toml" "--release"
+if (-not $Clean) {
+    Write-Step "Invalidating the desktop package while preserving dependency caches"
+    Invoke-Checked "cargo" "clean" "--manifest-path" "apps\desktop\src-tauri\Cargo.toml" "--package" "pi-remote" "--release"
+}
 $env:VITE_BUILD_REVISION = (git rev-parse --short HEAD).Trim()
 Write-Host "Desktop source revision: $env:VITE_BUILD_REVISION"
 
