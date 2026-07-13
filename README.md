@@ -98,14 +98,13 @@ The browser-only UI falls back to `localStorage` for connection settings. A Taur
 
 ## Run the Windows app during development
 
-After pulling changes, launch the current source directly in a native Tauri window:
+Update the repository and launch the current source directly in a native Tauri window with one command:
 
 ```powershell
-git pull
-powershell -ExecutionPolicy Bypass -File .\run-windows.ps1
+powershell -ExecutionPolicy Bypass -File .\update-and-run-windows.ps1
 ```
 
-This skips tests, installers, and release packaging. Rust dependencies remain cached, Vite serves the current frontend directly, and the window reloads as UI files change. Stop it with `Ctrl+C`.
+Use `run-windows.ps1` when the repository is already current. Both scripts skip tests, installers, and release packaging. Rust dependencies remain cached, Vite serves the current frontend directly, and the window reloads as UI files change. Stop it with `Ctrl+C`.
 
 ## Build the Windows executable on another computer
 
