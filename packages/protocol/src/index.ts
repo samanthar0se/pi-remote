@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const PROTOCOL_VERSION = 2 as const;
+export const PROTOCOL_VERSION = 3 as const;
 const requestId = z.string().min(1).max(128);
 const text = z.string().max(2_000_000);
 const commandBase = { id: requestId } as const;
@@ -19,9 +19,6 @@ export const clientCommandSchema = z.discriminatedUnion("type", [
   z.object({ ...commandBase, type: z.literal("compact"), customInstructions: z.string().max(20_000).optional() }).strict(),
   z.object({ ...commandBase, type: z.literal("set_plan_mode"), mode: z.enum(["enter", "exit", "toggle", "status"]) }).strict(),
   z.object({ ...commandBase, type: z.literal("start_code_review"), diffType: z.string().optional(), defaultBranch: z.string().optional() }).strict(),
-  z.object({ ...commandBase, type: z.literal("list_sessions") }).strict(),
-  z.object({ ...commandBase, type: z.literal("switch_session"), sessionId: z.string().min(1).max(128) }).strict(),
-  z.object({ ...commandBase, type: z.literal("new_session"), cwd: z.string().min(1).max(4096).optional() }).strict(),
 ]);
 
 export const clientMessageSchema = z.union([authMessageSchema, clientCommandSchema]);
@@ -37,18 +34,8 @@ export const snapshotSchema = z.object({
   contextUsage: z.unknown().nullable(), planPhase: z.enum(["idle", "planning", "executing", "reviewing"]).default("idle"),
 }).strict();
 
-export const sessionItemSchema = z.object({
-  id: z.string(), name: z.string(), cwd: z.string(), project: z.string(), createdAt: z.string(), modifiedAt: z.string(),
-  messageCount: z.number().int().nonnegative(), firstMessage: z.string(), active: z.boolean(), running: z.boolean(), reviewing: z.boolean(),
-}).strict();
-
-export const sessionCatalogSchema = z.object({
-  type: z.literal("session_catalog"), sessions: z.array(sessionItemSchema), activeSessionId: z.string().nullable(),
-}).strict();
-
-export const sessionSwitchingSchema = z.object({ type: z.literal("session_switching"), sessionId: z.string().nullable() }).strict();
 export const hostStateSchema = z.object({
-  type: z.literal("host_state"), rpcStatus: z.enum(["starting", "ready", "switching", "error", "stopped"]),
+  type: z.literal("host_state"), rpcStatus: z.enum(["starting", "ready", "error", "stopped"]),
   activeReviewId: z.string().nullable().optional(), error: z.string().optional(),
 }).strict();
 
@@ -67,7 +54,7 @@ export const errorMessageSchema = z.object({
 }).strict();
 
 export const serverMessageSchema = z.discriminatedUnion("type", [
-  snapshotSchema, sessionCatalogSchema, sessionSwitchingSchema, hostStateSchema, eventMessageSchema,
+  snapshotSchema, hostStateSchema, eventMessageSchema,
   responseMessageSchema, reviewStartedSchema, reviewFinishedSchema, errorMessageSchema,
 ]);
 
@@ -76,8 +63,6 @@ export type ClientCommandInput = ClientCommand extends infer C ? C extends { id:
 export type ClientMessage = z.infer<typeof clientMessageSchema>;
 export type Snapshot = z.infer<typeof snapshotSchema>;
 export type ServerMessage = z.infer<typeof serverMessageSchema>;
-export type SessionItem = z.infer<typeof sessionItemSchema>;
-export type SessionCatalog = z.infer<typeof sessionCatalogSchema>;
 export type PiEvent = z.infer<typeof eventMessageSchema>["event"];
 export type ReviewStarted = z.infer<typeof reviewStartedSchema>;
 export type ReviewFinished = z.infer<typeof reviewFinishedSchema>;

@@ -1,8 +1,6 @@
 import { PROTOCOL_VERSION, parseServerMessage, type ClientCommand, type ClientCommandInput, type ServerMessage } from "@pi-remote/protocol";
 
 export type HostProfile = {
-  id: string;
-  name: string;
   host: string;
   controlPort: number;
   plannotatorPort: number;
@@ -47,7 +45,7 @@ export class PiConnection {
     this.generation++;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.reconnectTimer = null;
-    this.socket?.close(1000, "Switching instance");
+    this.socket?.close(1000, "Updating connection settings");
     this.socket = null;
     this.rejectPending("Disconnected");
   }

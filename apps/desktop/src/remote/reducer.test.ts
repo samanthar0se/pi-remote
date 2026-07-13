@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { PROTOCOL_VERSION } from "@pi-remote/protocol";
 import { emptySession, reducePiEvent, replaceFromSnapshot } from "./reducer";
 
 const snapshot = (name: string, text: string) => ({
-  type: "snapshot" as const, version: 2 as const, sessionFile: `${name}.jsonl`, sessionName: name, cwd: `/work/${name}`,
+  type: "snapshot" as const, version: PROTOCOL_VERSION, sessionFile: `${name}.jsonl`, sessionName: name, cwd: `/work/${name}`,
   entries: [{ type: "message", id: `${name}-1`, message: { role: "user", content: text } }], model: null,
   availableModels: [], thinkingLevel: "off", isRunning: false, contextUsage: null, planPhase: "idle" as const,
 });

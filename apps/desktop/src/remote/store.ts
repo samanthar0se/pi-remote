@@ -1,63 +1,76 @@
 import { create } from "zustand";
 import { load } from "@tauri-apps/plugin-store";
-import type { ClientCommandInput, ReviewStarted, ServerMessage, SessionItem } from "@pi-remote/protocol";
+import type { ClientCommandInput, ReviewStarted, ServerMessage } from "@pi-remote/protocol";
 import { PiConnection, type HostProfile } from "./connection";
 import { emptySession, reducePiEvent, replaceFromSnapshot, type SessionState } from "./reducer";
 
 export type ActiveReview = { reviewId: string; kind: "plan" | "code"; url: string; visible: boolean; loading: boolean };
 
+type LegacyHostProfile = HostProfile & { id?: string; name?: string };
+
 type AppStore = {
-  profiles: HostProfile[];
-  activeProfileId: string | null;
+  profile: HostProfile | null;
   connectionState: "connecting" | "connected" | "offline" | "error";
   connectionDetail?: string;
   session: SessionState;
-  sessions: SessionItem[];
-  activeSessionId: string | null;
-  switchingSessionId: string | null;
-  rpcStatus: "starting" | "ready" | "switching" | "error" | "stopped";
+  rpcStatus: "starting" | "ready" | "error" | "stopped";
   review: ActiveReview | null;
   lastError?: string;
-  hydrateProfiles: () => Promise<void>;
+  hydrateProfile: () => Promise<void>;
   saveProfile: (profile: HostProfile) => Promise<void>;
-  removeProfile: (id: string) => Promise<void>;
-  activate: (id: string) => void;
+  clearProfile: () => Promise<void>;
   disconnect: () => void;
   command: (command: ClientCommandInput, timeoutMs?: number) => Promise<unknown>;
   showReview: (visible: boolean) => void;
   reviewLoaded: () => void;
 };
 
-const PROFILE_KEY = "profiles";
-const ACTIVE_KEY = "activeProfileId";
+const PROFILE_KEY = "profile";
+const LEGACY_PROFILES_KEY = "profiles";
+const LEGACY_ACTIVE_KEY = "activeProfileId";
 
-async function writeProfiles(profiles: HostProfile[], activeProfileId: string | null): Promise<void> {
+function normalizeProfile(value: LegacyHostProfile | null | undefined): HostProfile | null {
+  if (!value?.host || !value.token) return null;
+  return {
+    host: value.host,
+    controlPort: Number(value.controlPort || 31415),
+    plannotatorPort: Number(value.plannotatorPort || 19432),
+    token: value.token,
+  };
+}
+
+async function writeProfile(profile: HostProfile | null): Promise<void> {
   try {
     const store = await load("profiles.json", { autoSave: true, defaults: {} });
-    await store.set(PROFILE_KEY, profiles);
-    await store.set(ACTIVE_KEY, activeProfileId);
+    await store.set(PROFILE_KEY, profile);
+    await store.delete(LEGACY_PROFILES_KEY);
+    await store.delete(LEGACY_ACTIVE_KEY);
   } catch {
-    localStorage.setItem(PROFILE_KEY, JSON.stringify(profiles));
-    localStorage.setItem(ACTIVE_KEY, activeProfileId || "");
+    localStorage.removeItem(LEGACY_PROFILES_KEY);
+    localStorage.removeItem(LEGACY_ACTIVE_KEY);
+    if (profile) localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+    else localStorage.removeItem(PROFILE_KEY);
   }
 }
 
-async function readProfiles(): Promise<{ profiles: HostProfile[]; activeProfileId: string | null }> {
+async function readProfile(): Promise<HostProfile | null> {
   try {
     const store = await load("profiles.json", { autoSave: true, defaults: {} });
-    return {
-      profiles: (await store.get<HostProfile[]>(PROFILE_KEY)) || [],
-      activeProfileId: (await store.get<string>(ACTIVE_KEY)) || null,
-    };
+    const current = normalizeProfile(await store.get<LegacyHostProfile>(PROFILE_KEY));
+    if (current) return current;
+    const profiles = (await store.get<LegacyHostProfile[]>(LEGACY_PROFILES_KEY)) || [];
+    const activeId = await store.get<string>(LEGACY_ACTIVE_KEY);
+    return normalizeProfile(profiles.find((profile) => profile.id === activeId) || profiles[0]);
   } catch {
-    return {
-      profiles: JSON.parse(localStorage.getItem(PROFILE_KEY) || "[]"),
-      activeProfileId: localStorage.getItem(ACTIVE_KEY) || null,
-    };
+    const current = normalizeProfile(JSON.parse(localStorage.getItem(PROFILE_KEY) || "null"));
+    if (current) return current;
+    const profiles = JSON.parse(localStorage.getItem(LEGACY_PROFILES_KEY) || "[]") as LegacyHostProfile[];
+    const activeId = localStorage.getItem(LEGACY_ACTIVE_KEY);
+    return normalizeProfile(profiles.find((profile) => profile.id === activeId) || profiles[0]);
   }
 }
 
-function reviewUrl(profile: HostProfile | undefined, message: ReviewStarted): string {
+function reviewUrl(profile: HostProfile | null, message: ReviewStarted): string {
   if (!profile) return message.url;
   try {
     const url = new URL(message.url);
@@ -77,17 +90,12 @@ export const useAppStore = create<AppStore>((set, get) => {
     onMessage(message: ServerMessage) {
       if (message.type === "snapshot") {
         set({ session: replaceFromSnapshot(message), lastError: undefined });
-      } else if (message.type === "session_catalog") {
-        set({ sessions: message.sessions, activeSessionId: message.activeSessionId });
-      } else if (message.type === "session_switching") {
-        set({ switchingSessionId: message.sessionId });
       } else if (message.type === "host_state") {
         set({ rpcStatus: message.rpcStatus, lastError: message.error });
       } else if (message.type === "event") {
         set((state) => ({ session: reducePiEvent(state.session, message.event) }));
       } else if (message.type === "review_started") {
-        const profile = get().profiles.find((item) => item.id === get().activeProfileId);
-        set({ review: { reviewId: message.reviewId, kind: message.kind, url: reviewUrl(profile, message), visible: true, loading: true } });
+        set({ review: { reviewId: message.reviewId, kind: message.kind, url: reviewUrl(get().profile, message), visible: true, loading: true } });
       } else if (message.type === "review_finished") {
         set((state) => state.review?.reviewId === message.reviewId
           ? { review: null, lastError: message.error }
@@ -99,35 +107,25 @@ export const useAppStore = create<AppStore>((set, get) => {
   });
 
   return {
-    profiles: [], activeProfileId: null, connectionState: "offline", session: emptySession,
-    sessions: [], activeSessionId: null, switchingSessionId: null, rpcStatus: "stopped", review: null,
-    async hydrateProfiles() {
-      const data = await readProfiles();
-      set(data);
-      if (data.activeProfileId && data.profiles.some((profile) => profile.id === data.activeProfileId)) get().activate(data.activeProfileId);
+    profile: null,
+    connectionState: "offline",
+    session: emptySession,
+    rpcStatus: "stopped",
+    review: null,
+    async hydrateProfile() {
+      const profile = await readProfile();
+      set({ profile });
+      if (profile) connection.connect(profile);
     },
     async saveProfile(profile) {
-      const profiles = [...get().profiles.filter((item) => item.id !== profile.id), profile];
-      set({ profiles });
-      await writeProfiles(profiles, get().activeProfileId);
-    },
-    async removeProfile(id) {
-      const profiles = get().profiles.filter((item) => item.id !== id);
-      let activeProfileId = get().activeProfileId;
-      if (activeProfileId === id) {
-        connection.disconnect();
-        activeProfileId = null;
-        set({ session: emptySession, sessions: [], activeSessionId: null, switchingSessionId: null, review: null, connectionState: "offline" });
-      }
-      set({ profiles, activeProfileId });
-      await writeProfiles(profiles, activeProfileId);
-    },
-    activate(id) {
-      const profile = get().profiles.find((item) => item.id === id);
-      if (!profile) return;
-      set({ activeProfileId: id, session: emptySession, sessions: [], activeSessionId: null, switchingSessionId: null, review: null, lastError: undefined });
-      void writeProfiles(get().profiles, id);
+      set({ profile, session: emptySession, review: null, lastError: undefined });
+      await writeProfile(profile);
       connection.connect(profile);
+    },
+    async clearProfile() {
+      connection.disconnect();
+      set({ profile: null, session: emptySession, review: null, connectionState: "offline", connectionDetail: undefined });
+      await writeProfile(null);
     },
     disconnect() {
       connection.disconnect();
