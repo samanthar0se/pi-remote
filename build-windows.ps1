@@ -140,6 +140,9 @@ if (-not $SkipTests) {
     Invoke-Checked "corepack" "pnpm" "-r" "typecheck"
 }
 
+Write-Step "Invalidating the cached desktop shell while preserving dependency caches"
+Invoke-Checked "cargo" "clean" "--manifest-path" "apps\desktop\src-tauri\Cargo.toml" "--package" "pi-remote" "--release"
+
 if ($PortableOnly) {
     Write-Step "Building the portable Windows executable"
     Invoke-Checked "corepack" "pnpm" "--filter" "@pi-remote/desktop" "tauri" "build" "--no-bundle"
@@ -172,5 +175,5 @@ if (-not $PortableOnly) {
 Write-Host "`nBuild complete." -ForegroundColor Green
 Write-Host "Executable(s):"
 Get-ChildItem -Path $artifactDirectory -Filter "*.exe" -File | ForEach-Object {
-    Write-Host "  $($_.FullName)" -ForegroundColor Yellow
+    Write-Host "  $($_.FullName)  $($_.LastWriteTime.ToString('s'))  $([math]::Round($_.Length / 1MB, 1)) MB" -ForegroundColor Yellow
 }
