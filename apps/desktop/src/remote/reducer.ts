@@ -105,8 +105,8 @@ export function replaceFromSnapshot(snapshot: Snapshot): SessionState {
   };
 }
 
-function findLastMatching<T>(items: T[], predicate: (item: T) => boolean): number {
-  for (let index = items.length - 1; index >= 0; index--) if (predicate(items[index]!)) return index;
+function findLastMatching<T>(items: T[], predicate: (item: T) => boolean, startIndex = 0): number {
+  for (let index = items.length - 1; index >= startIndex; index--) if (predicate(items[index]!)) return index;
   return -1;
 }
 
@@ -149,7 +149,7 @@ export function reducePiEvent(state: SessionState, rawEvent: unknown): SessionSt
       const type = delta.type === "text_delta" ? "text" : "reasoning";
       return { ...state, messages: updateLastAssistant(state.messages, (message) => {
         const parts = [...(message.content as any[])];
-        let index = findLastMatching(parts, (part: any) => part.type === type);
+        let index = findLastMatching(parts, (part: any) => part.type === type, state.activeAssistantPartStart ?? 0);
         if (index < 0) { parts.push({ type, text: "" }); index = parts.length - 1; }
         parts[index] = { ...parts[index], text: String(parts[index].text || "") + String(delta.delta || "") };
         return { ...message, content: parts, status: { type: "running" } } as UiMessage;

@@ -26,14 +26,17 @@ describe("Pi state reduction", () => {
   it("keeps tool turns and the final answer in one assistant task", () => {
     let state = reducePiEvent(emptySession, { type: "agent_start" });
     state = reducePiEvent(state, { type: "message_start", message: { id: "a1", role: "assistant", content: [] } });
+    state = reducePiEvent(state, { type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "Checking." } });
     state = reducePiEvent(state, { type: "message_end", message: { id: "a1", role: "assistant", content: [{ type: "text", text: "Checking." }, { type: "toolCall", id: "t1", name: "read", arguments: { path: "a.ts" } }] } });
     state = reducePiEvent(state, { type: "tool_execution_start", toolCallId: "t1", toolName: "read", args: { path: "a.ts" } });
     state = reducePiEvent(state, { type: "tool_execution_end", toolCallId: "t1", result: { content: [{ type: "text", text: "file" }] }, isError: false });
     state = reducePiEvent(state, { type: "message_start", message: { id: "a2", role: "assistant", content: [] } });
+    state = reducePiEvent(state, { type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "Done." } });
     state = reducePiEvent(state, { type: "message_end", message: { id: "a2", role: "assistant", content: [{ type: "text", text: "Done." }] } });
 
     expect(state.messages).toHaveLength(1);
     expect((state.messages[0]!.content as any[]).map((part) => part.type)).toEqual(["text", "tool-call", "text"]);
+    expect((state.messages[0]!.content as any[]).map((part) => part.text).filter(Boolean)).toEqual(["Checking.", "Done."]);
     expect((state.messages[0]!.content as any[])[1].result).toBe("file");
   });
 
