@@ -129,13 +129,25 @@ function groupTaskParts(parts: readonly any[]) {
   return groups;
 }
 
+export function isTaskActivityRunning(parts: readonly any[], indices: readonly number[], messageRunning: boolean): boolean {
+  let latestActivityIndex = -1;
+  for (let index = parts.length - 1; index >= 0; index--) {
+    if (parts[index]?.type === "reasoning" || parts[index]?.type === "tool-call") {
+      latestActivityIndex = index;
+      break;
+    }
+  }
+  if (!indices.includes(latestActivityIndex)) return false;
+  return messageRunning || indices.some((index) => parts[index]?.type === "tool-call" && parts[index]?.result === undefined);
+}
+
 function TaskActivity({ groupKey, indices, children }: { groupKey: string | undefined; indices: number[]; children?: ReactNode }) {
   const [open, setOpen] = useState(false);
   const parts = useAssistantState((state) => state.message.parts);
   const messageRunning = useAssistantState((state) => state.message.status?.type === "running");
   if (!groupKey) return <>{children}</>;
   const tools = indices.map((index) => parts[index]).filter((part) => part?.type === "tool-call");
-  const running = messageRunning || tools.some((part) => part?.type === "tool-call" && part.result === undefined);
+  const running = isTaskActivityRunning(parts, indices, messageRunning);
   const failed = tools.some((part) => part?.type === "tool-call" && part.isError);
   return <details className={`reasoning task-activity ${failed ? "error" : ""}`} open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
     <summary>{running && <LoaderCircle className="spin" size={14} />}<span className={running ? "thinking-shimmer" : undefined}>Thinking</span>{running && <em>Working</em>}<ChevronDown className={open ? "rotate" : ""} size={14} /></summary>
