@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ActionBarPrimitive,
   ComposerPrimitive,
@@ -103,17 +103,43 @@ type DisplayCommand = SlashCommand | { name: "new"; description: string; source:
 
 function CommandCompletion({ text, connected, allowNew, onComplete }: { text: string; connected: boolean; allowNew: boolean; onComplete: (value: string) => void }) {
   const remoteCommands = useAppStore((state) => state.session.commands);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const listRef = useRef<HTMLDivElement>(null);
   const trimmed = text.trimStart();
-  if (!connected || !trimmed.startsWith("/") || trimmed.slice(1).includes(" ")) return null;
   const query = trimmed.slice(1).toLowerCase();
   const localCommands: DisplayCommand[] = allowNew
     ? [{ name: "new", description: "Start a fresh persistent session", source: "client", scope: "temporary" }]
     : [];
   const commands: DisplayCommand[] = [...localCommands, ...remoteCommands.filter((command) => command.name !== "new")];
-  const matches = commands.filter((command) => command.name.toLowerCase().includes(query) || command.description?.toLowerCase().includes(query));
+  const matches = connected && trimmed.startsWith("/") && !trimmed.slice(1).includes(" ")
+    ? commands.filter((command) => command.name.toLowerCase().includes(query) || command.description?.toLowerCase().includes(query))
+    : [];
+
+  useEffect(() => { setSelectedIndex(0); }, [query, allowNew]);
+  useEffect(() => { listRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" }); }, [selectedIndex]);
+  useEffect(() => {
+    if (matches.length === 0) return;
+    const navigate = (event: KeyboardEvent) => {
+      const target = event.target;
+      if (!(target instanceof HTMLTextAreaElement) || !target.closest(".composer")) return;
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        event.stopPropagation();
+        setSelectedIndex((index) => event.key === "ArrowDown" ? (index + 1) % matches.length : (index - 1 + matches.length) % matches.length);
+      } else if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+        event.preventDefault();
+        event.stopPropagation();
+        const selected = matches[selectedIndex] ?? matches[0];
+        if (selected) onComplete(`/${selected.name} `);
+      }
+    };
+    window.addEventListener("keydown", navigate, true);
+    return () => window.removeEventListener("keydown", navigate, true);
+  }, [matches, onComplete, selectedIndex]);
+
   if (matches.length === 0) return null;
-  return <div className="command-completion" role="listbox" aria-label="Pi slash commands">
-    {matches.map((command) => <button key={`${command.source}:${command.name}`} type="button" role="option" onMouseDown={(event) => {
+  return <div ref={listRef} className="command-completion" role="listbox" aria-label="Pi slash commands">
+    {matches.map((command, index) => <button key={`${command.source}:${command.name}`} type="button" role="option" aria-selected={index === selectedIndex} onMouseEnter={() => setSelectedIndex(index)} onMouseDown={(event) => {
       event.preventDefault();
       onComplete(`/${command.name} `);
     }}>
