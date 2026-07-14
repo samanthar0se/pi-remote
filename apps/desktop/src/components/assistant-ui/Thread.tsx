@@ -116,6 +116,30 @@ function ComposerControls({ connected }: { connected: boolean }) {
   </div>;
 }
 
+function formatTokens(value: number): string {
+  return new Intl.NumberFormat(undefined, { notation: value >= 10_000 ? "compact" : "standard", maximumFractionDigits: 1 }).format(value);
+}
+
+function ContextWindowIndicator() {
+  const contextUsage = useAppStore((state) => state.session.contextUsage);
+  const model = useAppStore((state) => state.session.model);
+  const messageCount = useAppStore((state) => state.session.messages.length);
+  const contextWindow = contextUsage?.contextWindow ?? model?.contextWindow;
+  if (typeof contextWindow !== "number" || contextWindow <= 0) return null;
+  const percent = typeof contextUsage?.percent === "number" ? contextUsage.percent : messageCount === 0 ? 0 : null;
+  const fill = Math.min(100, Math.max(0, percent ?? 0));
+  const level = fill >= 90 ? "danger" : fill >= 70 ? "warning" : "normal";
+  const label = percent === null || contextUsage?.tokens === null
+    ? `Context usage unavailable · ${formatTokens(contextWindow)} token window`
+    : `${Math.round(percent)}% context used · ${formatTokens(contextUsage?.tokens ?? 0)} / ${formatTokens(contextWindow)} tokens`;
+  return <span className={`context-window ${level}`} role="img" aria-label={label} title={label}>
+    <svg viewBox="0 0 20 20" aria-hidden="true">
+      <circle className="context-track" cx="10" cy="10" r="7.5" pathLength="100" />
+      <circle className="context-value" cx="10" cy="10" r="7.5" pathLength="100" strokeDasharray={`${fill} 100`} />
+    </svg>
+  </span>;
+}
+
 function Composer() {
   const connected = useAppStore((s) => s.connectionState === "connected");
   const running = useAssistantState((s) => s.thread.isRunning);
@@ -143,6 +167,7 @@ function Composer() {
       <CommandCompletion text={guidance} connected={connected} allowNew={false} onComplete={setGuidance} />
       <textarea value={guidance} onChange={(e) => setGuidance(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); sendGuidance(); } }} rows={1} placeholder={delivery === "steer" ? "Send guidance during this turn…" : "Queue a follow-up turn…"} />
       <div className="composer-row"><select value={delivery} onChange={(e) => setDelivery(e.target.value as typeof delivery)}><option value="steer">Steer now</option><option value="follow_up">Follow up</option></select><div>
+        <ContextWindowIndicator />
         <button className="stop-button" disabled={!connected || stopping} onClick={() => void stop()} title="Stop Pi"><Square size={11} fill="currentColor" />{stopping ? "Stopping…" : "Stop"}</button>
         <button className="send-button" disabled={!connected || !guidance.trim()} onClick={sendGuidance} title="Send guidance"><ArrowUp size={17} /></button>
       </div></div>
@@ -152,6 +177,7 @@ function Composer() {
     <IdleCommandCompletion connected={connected} />
     <ComposerPrimitive.Input disabled={!connected} autoFocus rows={1} placeholder={connected ? "Ask Pi to make a change or type / for commands…" : "Select a connected instance"} />
     <div className="composer-row"><ComposerControls connected={connected} /><div>
+      <ContextWindowIndicator />
       <ComposerPrimitive.Send asChild><button className="send-button" disabled={!connected} title="Send"><ArrowUp size={17} /></button></ComposerPrimitive.Send>
     </div></div>
   </ComposerPrimitive.Root>;

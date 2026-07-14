@@ -1,4 +1,4 @@
-import type { SlashCommand, Snapshot } from "@pi-remote/protocol";
+import type { ContextUsage, SlashCommand, Snapshot } from "@pi-remote/protocol";
 import type { ThreadMessageLike } from "@assistant-ui/react";
 
 export type UiMessage = ThreadMessageLike & { id: string };
@@ -12,7 +12,7 @@ export type SessionState = {
   commands: SlashCommand[];
   thinkingLevel: string;
   isRunning: boolean;
-  contextUsage: unknown | null;
+  contextUsage: ContextUsage | null;
   planPhase: "idle" | "planning" | "executing" | "reviewing";
 };
 
@@ -154,6 +154,7 @@ export function reducePiEvent(state: SessionState, rawEvent: unknown): SessionSt
           : part) } as UiMessage)) };
     case "model_select": return { ...state, model: event.model ?? state.model };
     case "thinking_level_select": return { ...state, thinkingLevel: String(event.level ?? state.thinkingLevel) };
+    case "context_usage": return { ...state, contextUsage: event.contextUsage ?? null };
     case "plan_phase": return { ...state, planPhase: event.phase };
     case "session_before_compact":
     case "compaction_start": return { ...state, isRunning: true };

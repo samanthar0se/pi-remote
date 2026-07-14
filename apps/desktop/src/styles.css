@@ -138,6 +138,13 @@ main { min-width: 0; min-height: 0; height: 100%; display: flex; flex-direction:
 .composer-controls label:hover { background: var(--panel); }
 .composer-controls select { max-width: 165px; appearance: none; border: 0; outline: 0; color: inherit; background: transparent; font-size: 11px; cursor: pointer; }
 .composer-controls label:nth-child(2) select { max-width: 72px; text-transform: capitalize; }
+.context-window { width: 28px; height: 28px; display: grid; place-items: center; color: var(--muted); }
+.context-window svg { width: 20px; height: 20px; overflow: visible; transform: rotate(-90deg); }
+.context-window circle { fill: none; stroke-width: 2.5; }
+.context-track { stroke: var(--line-strong); }
+.context-value { stroke: currentColor; stroke-linecap: round; }
+.context-window.warning { color: #b7791f; }
+.context-window.danger { color: var(--danger); }
 .send-button, .stop-button { height: 32px; display: flex; align-items: center; justify-content: center; border: 0; cursor: pointer; }
 .send-button { width: 32px; border-radius: 50%; background: var(--accent); color: var(--accent-text); }
 .stop-button { gap: 6px; padding: 0 12px; border-radius: 16px; background: color-mix(in srgb, var(--danger) 12%, var(--panel)); color: var(--danger); font-size: 11px; font-weight: 600; }

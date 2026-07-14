@@ -31,4 +31,10 @@ describe("Pi state reduction", () => {
     expect(after.sessionName).toBe("new");
     expect(after.commands[0]?.name).toBe("skill:test");
   });
+
+  it("updates context usage from host events", () => {
+    const contextUsage = { tokens: 72_000, contextWindow: 128_000, percent: 56.25 };
+    const state = reducePiEvent(emptySession, { type: "context_usage", contextUsage });
+    expect(state.contextUsage).toEqual(contextUsage);
+  });
 });

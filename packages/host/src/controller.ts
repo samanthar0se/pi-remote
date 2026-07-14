@@ -159,7 +159,15 @@ export class HostController implements HostBackend {
     }
     if (event.type === "session_info_changed" || event.type === "agent_settled") void this.captureSessionPath();
     this.emit({ type: "event", event });
+    if (event.type === "agent_settled" || event.type === "compaction_end" || event.type === "model_select") void this.emitContextUsage();
     this.emitHostState();
+  }
+
+  private async emitContextUsage(): Promise<void> {
+    try {
+      const contextUsage = (await this.requireRpc().getSessionStats()).contextUsage ?? null;
+      this.emit({ type: "event", event: { type: "context_usage", contextUsage } });
+    } catch {}
   }
 
   private async captureSessionPath(): Promise<void> {
@@ -197,8 +205,8 @@ export class HostController implements HostBackend {
   private async snapshot(): Promise<Snapshot> {
     const rpc = this.requireRpc();
     const [state, entries, models, commands] = await Promise.all([rpc.getState(), rpc.getEntries(), rpc.getAvailableModels(), rpc.getCommands()]);
-    let contextUsage: unknown = null;
-    try { contextUsage = (await rpc.getSessionStats()).contextUsage ?? null; } catch {}
+    let contextUsage: Snapshot["contextUsage"] = null;
+    try { contextUsage = ((await rpc.getSessionStats()).contextUsage as Snapshot["contextUsage"]) ?? null; } catch {}
     this.activePath = state.sessionFile || this.activePath;
     this.persist();
     return {

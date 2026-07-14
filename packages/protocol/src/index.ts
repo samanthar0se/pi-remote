@@ -29,6 +29,10 @@ export const modelSchema = z.object({
   provider: z.string(), id: z.string(), name: z.string().optional(), contextWindow: z.number().optional(),
 }).passthrough();
 
+export const contextUsageSchema = z.object({
+  tokens: z.number().nonnegative().nullable(), contextWindow: z.number().positive(), percent: z.number().nonnegative().nullable(),
+}).passthrough();
+
 export const slashCommandSchema = z.object({
   name: z.string().min(1), description: z.string().optional(),
   source: z.enum(["extension", "prompt", "skill"]), scope: z.enum(["user", "project", "temporary"]),
@@ -38,7 +42,7 @@ export const snapshotSchema = z.object({
   type: z.literal("snapshot"), version: z.literal(PROTOCOL_VERSION), sessionFile: z.string().nullable(),
   sessionName: z.string().nullable(), cwd: z.string(), entries: z.array(z.unknown()), model: modelSchema.nullable(),
   availableModels: z.array(modelSchema), commands: z.array(slashCommandSchema), thinkingLevel: z.string(), isRunning: z.boolean(),
-  contextUsage: z.unknown().nullable(), planPhase: z.enum(["idle", "planning", "executing", "reviewing"]).default("idle"),
+  contextUsage: contextUsageSchema.nullable(), planPhase: z.enum(["idle", "planning", "executing", "reviewing"]).default("idle"),
 }).strict();
 
 export const hostStateSchema = z.object({
@@ -68,6 +72,7 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
 export type ClientCommand = z.infer<typeof clientCommandSchema>;
 export type ClientCommandInput = ClientCommand extends infer C ? C extends { id: string } ? Omit<C, "id"> : never : never;
 export type ClientMessage = z.infer<typeof clientMessageSchema>;
+export type ContextUsage = z.infer<typeof contextUsageSchema>;
 export type Snapshot = z.infer<typeof snapshotSchema>;
 export type SlashCommand = z.infer<typeof slashCommandSchema>;
 export type ServerMessage = z.infer<typeof serverMessageSchema>;
