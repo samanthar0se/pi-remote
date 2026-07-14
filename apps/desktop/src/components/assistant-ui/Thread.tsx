@@ -52,15 +52,21 @@ function Reasoning({ text }: { text: string }) {
 }
 
 function groupTaskParts(parts: readonly any[]) {
-  let lastToolIndex = -1;
-  parts.forEach((part, index) => { if (part.type === "tool-call") lastToolIndex = index; });
-  const activity: number[] = [];
-  const visible: { groupKey: undefined; indices: number[] }[] = [];
+  const groups: { groupKey: string | undefined; indices: number[] }[] = [];
+  let activityGroup: { groupKey: string; indices: number[] } | undefined;
   parts.forEach((part, index) => {
-    if (part.type === "reasoning" || part.type === "tool-call" || index < lastToolIndex) activity.push(index);
-    else visible.push({ groupKey: undefined, indices: [index] });
+    if (part.type === "reasoning" || part.type === "tool-call") {
+      if (!activityGroup) {
+        activityGroup = { groupKey: `task-activity-${groups.length}`, indices: [] };
+        groups.push(activityGroup);
+      }
+      activityGroup.indices.push(index);
+    } else {
+      activityGroup = undefined;
+      groups.push({ groupKey: undefined, indices: [index] });
+    }
   });
-  return [...(activity.length ? [{ groupKey: "task-activity", indices: activity }] : []), ...visible];
+  return groups;
 }
 
 function TaskActivity({ groupKey, indices, children }: { groupKey: string | undefined; indices: number[]; children?: ReactNode }) {
