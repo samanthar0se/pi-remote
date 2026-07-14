@@ -151,6 +151,28 @@ export function isTaskActivityRunning(parts: readonly any[], indices: readonly n
   return messageRunning && !finalAnswerStarted;
 }
 
+export function isWorkAnswerBoundary(parts: readonly any[], indices: readonly number[]): boolean {
+  let latestActivityIndex = -1;
+  for (let index = parts.length - 1; index >= 0; index--) {
+    if (parts[index]?.type === "reasoning" || parts[index]?.type === "tool-call") {
+      latestActivityIndex = index;
+      break;
+    }
+  }
+  if (latestActivityIndex < 0 || indices[0] !== latestActivityIndex + 1) return false;
+  return indices.some((index) => parts[index]?.type !== "text" || String(parts[index]?.text || "").trim().length > 0);
+}
+
+export function formatWorkedDuration(durationMs: number): string {
+  const totalSeconds = Math.max(0, Math.floor(durationMs / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
+}
+
 type ActivityKind = "command" | "edit" | "read" | "search" | "web" | "tool" | "thinking";
 
 function classifyTool(toolName: string): ActivityKind {
@@ -209,7 +231,7 @@ function TaskActivity({ groupKey, indices, children }: { groupKey: string | unde
   const [open, setOpen] = useState(false);
   const parts = useAssistantState((state) => state.message.parts);
   const messageRunning = useAssistantState((state) => state.message.status?.type === "running");
-  if (!groupKey) return <>{children}</>;
+  if (!groupKey) return <>{isWorkAnswerBoundary(parts, indices) && <WorkedDivider />}{children}</>;
   const tools = indices.map((index) => parts[index]).filter((part) => part?.type === "tool-call");
   const running = isTaskActivityRunning(parts, indices, messageRunning);
   const failed = tools.some((part) => part?.type === "tool-call" && part.isError);
@@ -218,6 +240,17 @@ function TaskActivity({ groupKey, indices, children }: { groupKey: string | unde
     <summary>{running ? <LoaderCircle className="spin" size={14} /> : <ActivityIcon kind={summary.kind} />}<span className={running ? "thinking-shimmer" : undefined}>{summary.label}</span><ChevronDown className={open ? "rotate" : ""} size={14} /></summary>
     <div className="task-activity-content">{children}</div>
   </details>;
+}
+
+function WorkedDivider() {
+  const timing = useAssistantState((state) => state.message.metadata.custom as { startedAtMs?: number; completedAtMs?: number });
+  const startedAtMs = timing?.startedAtMs;
+  const completedAtMs = timing?.completedAtMs;
+  if (typeof startedAtMs !== "number" || typeof completedAtMs !== "number" || completedAtMs - startedAtMs < 1000) return null;
+  return <div className="worked-divider">
+    <span>Worked for {formatWorkedDuration(completedAtMs - startedAtMs)}<ChevronDown size={14} /></span>
+    <i />
+  </div>;
 }
 
 function AssistantMessage() {

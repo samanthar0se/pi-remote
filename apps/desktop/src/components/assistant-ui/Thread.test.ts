@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groupTaskParts, isTaskActivityRunning, summarizeTaskActivity } from "./Thread";
+import { formatWorkedDuration, groupTaskParts, isTaskActivityRunning, isWorkAnswerBoundary, summarizeTaskActivity } from "./Thread";
 
 describe("task activity grouping", () => {
   it("folds progress text and tools into one work slice", () => {
@@ -55,6 +55,25 @@ describe("task activity status", () => {
     ];
 
     expect(isTaskActivityRunning(parts, [0], true)).toBe(false);
+  });
+});
+
+describe("worked divider", () => {
+  it("recognizes the handoff from activity to the final answer", () => {
+    const parts = [
+      { type: "reasoning", text: "checking" },
+      { type: "tool-call", toolCallId: "tool-1", result: "done" },
+      { type: "text", text: "Here is the result." },
+    ];
+
+    expect(isWorkAnswerBoundary(parts, [2])).toBe(true);
+    expect(isWorkAnswerBoundary([{ type: "text", text: "A direct answer." }], [0])).toBe(false);
+  });
+
+  it("formats compact elapsed time", () => {
+    expect(formatWorkedDuration(40 * 60_000 + 42_000)).toBe("40m 42s");
+    expect(formatWorkedDuration(3_200)).toBe("3s");
+    expect(formatWorkedDuration(3_661_000)).toBe("1h 1m");
   });
 });
 

@@ -15,12 +15,13 @@ export type SessionState = {
   contextUsage: ContextUsage | null;
   planPhase: "idle" | "planning" | "executing" | "reviewing";
   activeAssistantPartStart: number | null;
+  activeTurnStartedAtMs: number | null;
 };
 
 export const emptySession: SessionState = {
   messages: [], sessionFile: null, sessionName: null, cwd: "", model: null,
   availableModels: [], commands: [], thinkingLevel: "off", isRunning: false, contextUsage: null, planPhase: "idle",
-  activeAssistantPartStart: null,
+  activeAssistantPartStart: null, activeTurnStartedAtMs: null,
 };
 
 function asObject(value: unknown): Record<string, any> {
@@ -50,9 +51,30 @@ function messageId(entry: any, index: number): string {
   return String(entry?.id ?? entry?.entryId ?? entry?.message?.id ?? `entry-${index}`);
 }
 
+function timestampMs(value: unknown): number | undefined {
+  if (value == null) return undefined;
+  const timestamp = new Date(value as string | number).getTime();
+  return Number.isFinite(timestamp) ? timestamp : undefined;
+}
+
+function withTiming(message: UiMessage, startedAtMs: number, completedAtMs?: number): UiMessage {
+  const metadata = message.metadata ?? {};
+  return {
+    ...message,
+    metadata: { ...metadata, custom: { ...metadata.custom, startedAtMs, ...(completedAtMs === undefined ? {} : { completedAtMs }) } },
+  } as UiMessage;
+}
+
+function clearCompletedTiming(message: UiMessage): UiMessage {
+  const metadata = message.metadata ?? {};
+  const { completedAtMs: _completedAtMs, ...custom } = metadata.custom ?? {};
+  return { ...message, metadata: { ...metadata, custom } } as UiMessage;
+}
+
 export function normalizeEntries(entries: unknown[]): UiMessage[] {
   const messages: UiMessage[] = [];
   const toolLocations = new Map<string, { message: UiMessage; index: number }>();
+  let turnStartedAtMs: number | undefined;
   entries.forEach((raw, index) => {
     const entry = asObject(raw);
     if (entry.type !== "message") return;
@@ -64,6 +86,8 @@ export function normalizeEntries(entries: unknown[]): UiMessage[] {
         const offset = (previous.content as any[]).length;
         (previous as any).content = [...previous.content as any[], ...parts];
         (previous as any).status = message.stopReason === "error" ? { type: "incomplete", reason: "error" } : { type: "complete", reason: "stop" };
+        const completedAtMs = timestampMs(entry.timestamp);
+        if (completedAtMs !== undefined) Object.assign(previous, withTiming(previous, Number(previous.metadata?.custom?.startedAtMs ?? completedAtMs), completedAtMs));
         parts.forEach((part, partIndex) => {
           if (part.type === "tool-call" && part.toolCallId) toolLocations.set(part.toolCallId, { message: previous, index: offset + partIndex });
         });
@@ -74,9 +98,14 @@ export function normalizeEntries(entries: unknown[]): UiMessage[] {
         createdAt: entry.timestamp ? new Date(entry.timestamp) : undefined,
         ...(message.role === "assistant" ? { status: message.stopReason === "error" ? { type: "incomplete", reason: "error" } : { type: "complete", reason: "stop" } } : {}),
       } as UiMessage;
-      messages.push(normalized);
+      const entryTimestampMs = timestampMs(entry.timestamp);
+      const timed = message.role === "assistant" && entryTimestampMs !== undefined
+        ? withTiming(normalized, turnStartedAtMs ?? entryTimestampMs, entryTimestampMs)
+        : normalized;
+      messages.push(timed);
+      if (message.role === "user") turnStartedAtMs = entryTimestampMs;
       parts.forEach((part, partIndex) => {
-        if (part.type === "tool-call" && part.toolCallId) toolLocations.set(part.toolCallId, { message: normalized, index: partIndex });
+        if (part.type === "tool-call" && part.toolCallId) toolLocations.set(part.toolCallId, { message: timed, index: partIndex });
       });
       return;
     }
@@ -104,7 +133,8 @@ export function replaceFromSnapshot(snapshot: Snapshot): SessionState {
     messages: normalizeEntries(snapshot.entries), sessionFile: snapshot.sessionFile,
     sessionName: snapshot.sessionName, cwd: snapshot.cwd, model: snapshot.model,
     availableModels: [...snapshot.availableModels], commands: [...snapshot.commands], thinkingLevel: snapshot.thinkingLevel,
-    isRunning: snapshot.isRunning, contextUsage: snapshot.contextUsage, planPhase: snapshot.planPhase, activeAssistantPartStart: null,
+    isRunning: snapshot.isRunning, contextUsage: snapshot.contextUsage, planPhase: snapshot.planPhase,
+    activeAssistantPartStart: null, activeTurnStartedAtMs: null,
   };
 }
 
@@ -124,9 +154,9 @@ function updateLastAssistant(messages: UiMessage[], updater: (message: UiMessage
 export function reducePiEvent(state: SessionState, rawEvent: unknown): SessionState {
   const event = asObject(rawEvent);
   switch (event.type) {
-    case "agent_start": return { ...state, isRunning: true };
+    case "agent_start": return { ...state, isRunning: true, activeTurnStartedAtMs: timestampMs(event.timestamp) ?? Date.now() };
     case "agent_end":
-    case "agent_settled": return { ...state, isRunning: false };
+    case "agent_settled": return { ...state, isRunning: false, activeTurnStartedAtMs: null };
     case "message_start": {
       const msg = asObject(event.message);
       if (msg.role !== "assistant" && msg.role !== "user") return state;
@@ -135,16 +165,18 @@ export function reducePiEvent(state: SessionState, rawEvent: unknown): SessionSt
       if (msg.role === "assistant" && previous?.role === "assistant") {
         const start = (previous.content as any[]).length;
         return { ...state, activeAssistantPartStart: start, messages: updateLastAssistant(state.messages, (message) => ({
-          ...message, content: [...message.content as any[], ...initialParts], status: { type: "running" },
+          ...clearCompletedTiming(message), content: [...message.content as any[], ...initialParts], status: { type: "running" },
         } as UiMessage)) };
       }
+      const startedAtMs = state.activeTurnStartedAtMs ?? timestampMs(event.timestamp ?? msg.timestamp) ?? Date.now();
       const next: UiMessage = {
         id: String(msg.id ?? `live-${Date.now()}-${state.messages.length}`), role: msg.role,
-        content: initialParts,
+        content: initialParts, createdAt: new Date(startedAtMs),
         ...(msg.role === "assistant" ? { status: { type: "running" } } : {}),
       } as UiMessage;
+      const timed = msg.role === "assistant" ? withTiming(next, startedAtMs) : next;
       const duplicate = state.messages.some((item) => item.id === next.id);
-      return duplicate ? state : { ...state, activeAssistantPartStart: msg.role === "assistant" ? 0 : null, messages: [...state.messages, next] };
+      return duplicate ? state : { ...state, activeAssistantPartStart: msg.role === "assistant" ? 0 : null, messages: [...state.messages, timed] };
     }
     case "message_update": {
       const delta = asObject(event.assistantMessageEvent);
@@ -155,7 +187,11 @@ export function reducePiEvent(state: SessionState, rawEvent: unknown): SessionSt
         let index = findLastMatching(parts, (part: any) => part.type === type, state.activeAssistantPartStart ?? 0);
         if (index < 0) { parts.push({ type, text: "" }); index = parts.length - 1; }
         parts[index] = { ...parts[index], text: String(parts[index].text || "") + String(delta.delta || "") };
-        return { ...message, content: parts, status: { type: "running" } } as UiMessage;
+        const updated = { ...message, content: parts, status: { type: "running" } } as UiMessage;
+        const finalAnswerStarted = type === "text" && parts.slice(0, index).some((part) => part.type === "reasoning" || part.type === "tool-call");
+        return finalAnswerStarted && typeof message.metadata?.custom?.completedAtMs !== "number"
+          ? withTiming(updated, Number(message.metadata?.custom?.startedAtMs ?? Date.now()), timestampMs(event.timestamp) ?? Date.now())
+          : updated;
       }) };
     }
     case "message_end": {
@@ -163,7 +199,11 @@ export function reducePiEvent(state: SessionState, rawEvent: unknown): SessionSt
       if (msg.role !== "assistant") return state;
       const finalizedParts = contentParts(msg);
       return { ...state, messages: updateLastAssistant(state.messages, (current) => ({
-        ...current,
+        ...withTiming(
+          current,
+          Number(current.metadata?.custom?.startedAtMs ?? Date.now()),
+          Number(current.metadata?.custom?.completedAtMs ?? timestampMs(event.timestamp ?? msg.timestamp) ?? Date.now()),
+        ),
         content: state.activeAssistantPartStart === null
           ? finalizedParts
           : [...(current.content as any[]).slice(0, state.activeAssistantPartStart), ...finalizedParts],
@@ -179,7 +219,7 @@ export function reducePiEvent(state: SessionState, rawEvent: unknown): SessionSt
         };
         if (index < 0) parts.push(toolPart);
         else parts[index] = { ...parts[index], ...toolPart };
-        return { ...message, content: parts, status: { type: "running" } } as UiMessage;
+        return { ...clearCompletedTiming(message), content: parts, status: { type: "running" } } as UiMessage;
       }) };
     case "tool_execution_update":
     case "tool_execution_end":
