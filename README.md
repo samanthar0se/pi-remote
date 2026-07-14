@@ -71,6 +71,7 @@ The token is stored in Tauri Store as local application data, not Windows Creden
 - Use **New** or `/new` to start a fresh persistent session; the previous session remains saved on the host.
 - Use Stop to call Pi's abort operation.
 - Model, thinking level, compact, and plan mode act on the remote Pi session.
+- Extension dialogs are bridged to the desktop, including `pi-ask-user` choices, freeform answers, comments, multi-select input, confirmation, and cancellation.
 - In plan mode, `plannotator_submit_plan` automatically opens the Review tab. Approve, reject, or annotate there; the blocked tool resumes directly from Plannotator.
 - **Review changes** opens an uncommitted-change code review. Submitted feedback is sent back to Pi as a follow-up.
 - You can return to Chat while a review is open; the Review tab remains visible until the matching review completes.
@@ -156,6 +157,7 @@ Use a Windows client and a second LAN machine running Pi:
 - connect and receive the current session snapshot;
 - send and observe streaming text/thinking;
 - run a tool and inspect running/completed output;
+- answer and cancel `pi-ask-user` select, freeform, comment, and multi-select prompts;
 - stop a run;
 - interrupt the network mid-stream, restore it, and verify snapshot replacement;
 - switch model/thinking and compact;

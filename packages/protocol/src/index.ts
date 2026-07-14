@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const PROTOCOL_VERSION = 5 as const;
+export const PROTOCOL_VERSION = 6 as const;
 const requestId = z.string().min(1).max(128);
 const text = z.string().max(2_000_000);
 const commandBase = { id: requestId } as const;
@@ -21,6 +21,10 @@ export const clientCommandSchema = z.discriminatedUnion("type", [
   z.object({ ...commandBase, type: z.literal("compact"), customInstructions: z.string().max(20_000).optional() }).strict(),
   z.object({ ...commandBase, type: z.literal("set_plan_mode"), mode: z.enum(["enter", "exit", "toggle", "status"]) }).strict(),
   z.object({ ...commandBase, type: z.literal("start_code_review"), diffType: z.string().optional(), defaultBranch: z.string().optional() }).strict(),
+  z.object({
+    ...commandBase, type: z.literal("extension_ui_response"), uiRequestId: requestId,
+    value: text.optional(), confirmed: z.boolean().optional(), cancelled: z.boolean().optional(),
+  }).strict(),
 ]);
 
 export const clientMessageSchema = z.union([authMessageSchema, clientCommandSchema]);
@@ -51,6 +55,14 @@ export const hostStateSchema = z.object({
 }).strict();
 
 export const eventMessageSchema = z.object({ type: z.literal("event"), event: z.object({ type: z.string() }).passthrough() }).strict();
+export const extensionUiRequestSchema = z.object({
+  type: z.literal("extension_ui_request"), id: requestId,
+  method: z.enum(["select", "confirm", "input", "editor", "notify", "setStatus", "setWidget", "setTitle", "set_editor_text"]),
+  title: z.string().optional(), message: z.string().optional(), options: z.array(z.string()).optional(), timeout: z.number().positive().optional(),
+  placeholder: z.string().optional(), prefill: z.string().optional(), notifyType: z.enum(["info", "warning", "error"]).optional(),
+  statusKey: z.string().optional(), statusText: z.string().optional(), widgetKey: z.string().optional(), widgetLines: z.array(z.string()).optional(),
+  widgetPlacement: z.enum(["aboveEditor", "belowEditor"]).optional(), text: z.string().optional(),
+}).passthrough();
 export const responseMessageSchema = z.object({
   type: z.literal("response"), id: requestId, command: z.string(), success: z.boolean(), data: z.unknown().optional(), error: z.string().optional(),
 }).strict();
@@ -65,7 +77,7 @@ export const errorMessageSchema = z.object({
 }).strict();
 
 export const serverMessageSchema = z.discriminatedUnion("type", [
-  snapshotSchema, hostStateSchema, eventMessageSchema,
+  snapshotSchema, hostStateSchema, eventMessageSchema, extensionUiRequestSchema,
   responseMessageSchema, reviewStartedSchema, reviewFinishedSchema, errorMessageSchema,
 ]);
 
@@ -73,6 +85,7 @@ export type ClientCommand = z.infer<typeof clientCommandSchema>;
 export type ClientCommandInput = ClientCommand extends infer C ? C extends { id: string } ? Omit<C, "id"> : never : never;
 export type ClientMessage = z.infer<typeof clientMessageSchema>;
 export type ContextUsage = z.infer<typeof contextUsageSchema>;
+export type ExtensionUiRequest = z.infer<typeof extensionUiRequestSchema>;
 export type Snapshot = z.infer<typeof snapshotSchema>;
 export type SlashCommand = z.infer<typeof slashCommandSchema>;
 export type ServerMessage = z.infer<typeof serverMessageSchema>;

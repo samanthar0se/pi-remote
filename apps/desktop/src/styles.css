@@ -167,6 +167,25 @@ main { min-width: 0; min-height: 0; height: 100%; display: flex; flex-direction:
 .review-external { position: absolute; z-index: 3; right: 13px; top: 10px; padding: 7px 10px; display: flex; align-items: center; gap: 5px; border-radius: 9px; background: #111d; color: #fff; text-decoration: none; font-size: 10px; }
 
 .dialog-backdrop { position: fixed; z-index: 50; inset: 0; display: grid; place-items: center; background: #0006; backdrop-filter: blur(4px); }
+.extension-ui-backdrop { z-index: 60; }
+.extension-ui-dialog { width: min(620px, calc(100vw - 32px)); max-height: min(760px, calc(100vh - 32px)); padding: 22px; overflow: auto; border: 1px solid var(--line); border-radius: 20px; background: var(--bg); box-shadow: 0 24px 90px #0005; }
+.extension-ui-dialog header, .extension-ui-dialog footer { display: flex; align-items: center; gap: 8px; }
+.extension-ui-dialog header { margin-bottom: 17px; }
+.extension-ui-dialog header strong { flex: 1; font-size: 17px; letter-spacing: -.02em; }
+.extension-ui-dialog header button { width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: 8px; background: transparent; cursor: pointer; }
+.extension-ui-dialog header button:hover { background: var(--panel); }
+.extension-ui-question { max-height: 300px; margin-bottom: 18px; overflow: auto; color: var(--text); white-space: pre-wrap; font-size: 13px; line-height: 1.6; }
+.extension-ui-error { margin: 0 0 12px; color: var(--danger); font-size: 11px; }
+.extension-ui-options { display: flex; flex-direction: column; gap: 8px; }
+.extension-ui-options button { width: 100%; padding: 11px 13px; border: 1px solid var(--line); border-radius: 11px; background: var(--panel); cursor: pointer; text-align: left; font-size: 13px; }
+.extension-ui-options button:hover:not(:disabled) { border-color: var(--work); background: color-mix(in srgb, var(--work) 7%, var(--panel)); }
+.extension-ui-dialog input, .extension-ui-dialog textarea { width: 100%; padding: 11px 12px; border: 1px solid var(--line-strong); border-radius: 11px; color: var(--text); background: var(--panel); outline: 0; }
+.extension-ui-dialog textarea { min-height: 180px; resize: vertical; font-family: var(--font-mono); font-size: 12px; line-height: 1.5; }
+.extension-ui-dialog footer { margin-top: 18px; }
+.extension-ui-dialog footer span { flex: 1; }
+.extension-ui-dialog footer button { padding: 8px 13px; border: 1px solid var(--line); border-radius: 9px; background: var(--bg); cursor: pointer; font-size: 11px; }
+.extension-ui-dialog footer .primary { border-color: var(--accent); background: var(--accent); color: var(--accent-text); }
+.extension-ui-dialog button:disabled { opacity: .45; cursor: not-allowed; }
 .profile-dialog { width: min(480px, calc(100vw - 32px)); padding: 22px; border: 1px solid var(--line); border-radius: 20px; background: var(--bg); box-shadow: 0 24px 90px #0004; }
 .profile-dialog header, .profile-dialog footer { display: flex; align-items: center; gap: 8px; }
 .profile-dialog header { margin-bottom: 22px; }

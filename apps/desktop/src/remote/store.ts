@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { load } from "@tauri-apps/plugin-store";
-import type { ClientCommandInput, ReviewStarted, ServerMessage } from "@pi-remote/protocol";
+import type { ClientCommandInput, ExtensionUiRequest, ReviewStarted, ServerMessage } from "@pi-remote/protocol";
 import { PiConnection, type HostProfile } from "./connection";
 import { emptySession, reducePiEvent, replaceFromSnapshot, type SessionState } from "./reducer";
 
@@ -15,12 +15,14 @@ type AppStore = {
   session: SessionState;
   rpcStatus: "starting" | "ready" | "error" | "stopped";
   review: ActiveReview | null;
+  extensionUiRequest: ExtensionUiRequest | null;
   lastError?: string;
   hydrateProfile: () => Promise<void>;
   saveProfile: (profile: HostProfile) => Promise<void>;
   clearProfile: () => Promise<void>;
   disconnect: () => void;
   command: (command: ClientCommandInput, timeoutMs?: number) => Promise<unknown>;
+  respondToExtensionUi: (response: { value?: string; confirmed?: boolean; cancelled?: boolean }) => Promise<void>;
   showReview: (visible: boolean) => void;
   reviewLoaded: () => void;
 };
@@ -93,7 +95,13 @@ export const useAppStore = create<AppStore>((set, get) => {
       } else if (message.type === "host_state") {
         set({ rpcStatus: message.rpcStatus, lastError: message.error });
       } else if (message.type === "event") {
-        set((state) => ({ session: reducePiEvent(state.session, message.event) }));
+        set((state) => ({
+          session: reducePiEvent(state.session, message.event),
+          ...(message.event.type === "agent_settled" ? { extensionUiRequest: null } : {}),
+        }));
+      } else if (message.type === "extension_ui_request") {
+        if (["select", "confirm", "input", "editor"].includes(message.method)) set({ extensionUiRequest: message });
+        else if (message.method === "notify" && message.notifyType === "error") set({ lastError: message.message });
       } else if (message.type === "review_started") {
         set({ review: { reviewId: message.reviewId, kind: message.kind, url: reviewUrl(get().profile, message), visible: true, loading: true } });
       } else if (message.type === "review_finished") {
@@ -112,19 +120,20 @@ export const useAppStore = create<AppStore>((set, get) => {
     session: emptySession,
     rpcStatus: "stopped",
     review: null,
+    extensionUiRequest: null,
     async hydrateProfile() {
       const profile = await readProfile();
       set({ profile });
       if (profile) connection.connect(profile);
     },
     async saveProfile(profile) {
-      set({ profile, session: emptySession, review: null, lastError: undefined });
+      set({ profile, session: emptySession, review: null, extensionUiRequest: null, lastError: undefined });
       await writeProfile(profile);
       connection.connect(profile);
     },
     async clearProfile() {
       connection.disconnect();
-      set({ profile: null, session: emptySession, review: null, connectionState: "offline", connectionDetail: undefined });
+      set({ profile: null, session: emptySession, review: null, extensionUiRequest: null, connectionState: "offline", connectionDetail: undefined });
       await writeProfile(null);
     },
     disconnect() {
@@ -132,6 +141,12 @@ export const useAppStore = create<AppStore>((set, get) => {
       set({ connectionState: "offline", connectionDetail: undefined, review: null });
     },
     command(command, timeoutMs) { return connection.command(command, timeoutMs); },
+    async respondToExtensionUi(response) {
+      const request = get().extensionUiRequest;
+      if (!request) return;
+      await connection.command({ type: "extension_ui_response", uiRequestId: request.id, ...response });
+      set((state) => state.extensionUiRequest?.id === request.id ? { extensionUiRequest: null } : {});
+    },
     showReview(visible) { set((state) => ({ review: state.review ? { ...state.review, visible } : null })); },
     reviewLoaded() { set((state) => ({ review: state.review ? { ...state.review, loading: false } : null })); },
   };

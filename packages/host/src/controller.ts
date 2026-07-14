@@ -2,8 +2,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { RpcClient } from "@earendil-works/pi-coding-agent";
-import { PROTOCOL_VERSION, type ClientCommand, type ServerMessage, type Snapshot } from "@pi-remote/protocol";
+import { RpcClient, type RpcExtensionUIResponse } from "@earendil-works/pi-coding-agent";
+import { PROTOCOL_VERSION, type ClientCommand, type ExtensionUiRequest, type ServerMessage, type Snapshot } from "@pi-remote/protocol";
 import { createTokenStore } from "../../pi-remote/token-store.ts";
 import { ReviewTracker } from "./plannotator.ts";
 import type { HostBackend } from "./types.ts";
@@ -24,6 +24,7 @@ export class HostController implements HostBackend {
   private planPhase: Snapshot["planPhase"] = "idle";
   private healthTimer: NodeJS.Timeout | null = null;
   private recovering = false;
+  private pendingUiRequest: ExtensionUiRequest | null = null;
   readonly tokenStore = createTokenStore();
   readonly review: ReviewTracker;
 
@@ -59,18 +60,20 @@ export class HostController implements HostBackend {
     if (this.healthTimer) clearInterval(this.healthTimer);
     this.healthTimer = null;
     this.rpcStatus = "stopped";
+    this.pendingUiRequest = null;
     this.emitHostState();
     await this.rpc?.stop();
     this.rpc = null;
   }
 
   async initialMessages(): Promise<ServerMessage[]> {
-    return [this.hostState(), await this.snapshot()];
+    return [this.hostState(), await this.snapshot(), ...(this.pendingUiRequest ? [this.pendingUiRequest] : [])];
   }
 
   async handle(command: ClientCommand): Promise<{ data?: unknown }> {
     if (command.type === "restart_pi") return { data: await this.restartRpc() };
     if (command.type === "new_session") return { data: await this.newSession() };
+    if (command.type === "extension_ui_response") { await this.respondToExtensionUi(command); return {}; }
     const rpc = this.requireRpc();
     switch (command.type) {
       case "prompt": await rpc.prompt(command.message); return {};
@@ -113,6 +116,7 @@ export class HostController implements HostBackend {
     }
     this.rpc = null;
     this.running = false;
+    this.pendingUiRequest = null;
     this.rpcStatus = "starting";
     this.emitHostState();
     if (rpc) try { await rpc.stop(); } catch {}
@@ -146,8 +150,17 @@ export class HostController implements HostBackend {
   }
 
   private onRpcEvent(event: any): void {
+    if (event.type === "extension_ui_request") {
+      const request = event as ExtensionUiRequest;
+      if (["select", "confirm", "input", "editor"].includes(request.method)) this.pendingUiRequest = request;
+      this.emit(request);
+      return;
+    }
     if (event.type === "agent_start") this.running = true;
-    if (event.type === "agent_settled") this.running = false;
+    if (event.type === "agent_settled") {
+      this.running = false;
+      this.pendingUiRequest = null;
+    }
     if (event.type === "tool_execution_start" && event.toolName === PLAN_TOOL && !this.review.active) {
       this.planPhase = "reviewing";
       this.review.start("plan", String(event.toolCallId));
@@ -161,6 +174,23 @@ export class HostController implements HostBackend {
     this.emit({ type: "event", event });
     if (event.type === "agent_settled" || event.type === "compaction_end" || event.type === "model_select") void this.emitContextUsage();
     this.emitHostState();
+  }
+
+  private async respondToExtensionUi(command: Extract<ClientCommand, { type: "extension_ui_response" }>): Promise<void> {
+    const request = this.pendingUiRequest;
+    if (!request || request.id !== command.uiRequestId) throw new Error("This Pi dialog is no longer active.");
+    if (!command.cancelled && request.method === "confirm" && command.confirmed === undefined) throw new Error("Confirmation response is missing.");
+    if (!command.cancelled && request.method !== "confirm" && command.value === undefined) throw new Error("Dialog response is missing.");
+    const response: RpcExtensionUIResponse = command.cancelled
+      ? { type: "extension_ui_response", id: request.id, cancelled: true }
+      : request.method === "confirm"
+        ? { type: "extension_ui_response", id: request.id, confirmed: Boolean(command.confirmed) }
+        : { type: "extension_ui_response", id: request.id, value: command.value! };
+    const rpc = this.requireRpc() as unknown as { process?: { stdin?: { destroyed?: boolean; writable?: boolean; write: (data: string) => void } } };
+    const stdin = rpc.process?.stdin;
+    if (!stdin || stdin.destroyed || stdin.writable === false) throw new Error("Pi RPC input is unavailable.");
+    this.pendingUiRequest = null;
+    stdin.write(`${JSON.stringify(response)}\n`);
   }
 
   private async emitContextUsage(): Promise<void> {

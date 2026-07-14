@@ -7,6 +7,8 @@ describe("protocol validation", () => {
     expect(clientMessageSchema.parse({ type: "prompt", id: "r1", message: "hello" }).type).toBe("prompt");
     expect(clientMessageSchema.parse({ type: "restart_pi", id: "r2" }).type).toBe("restart_pi");
     expect(clientMessageSchema.parse({ type: "new_session", id: "r3" }).type).toBe("new_session");
+    expect(clientMessageSchema.parse({ type: "extension_ui_response", id: "r4", uiRequestId: "ui-1", value: "Option A" }).type).toBe("extension_ui_response");
+    expect(parseServerMessage({ type: "extension_ui_request", id: "ui-1", method: "select", title: "Choose", options: ["Option A"] }).type).toBe("extension_ui_request");
   });
   it("rejects malformed and unknown messages", () => {
     expect(clientMessageSchema.safeParse({ type: "abort" }).success).toBe(false);

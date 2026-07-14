@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Archive, Code2, FilePlus2, Moon, Settings, Sun, Unplug, Zap } from "lucide-react";
 import { Toaster, toast } from "sonner";
+import { ExtensionUiDialog } from "./components/ExtensionUiDialog";
 import { HostSettingsDialog } from "./components/HostSettingsDialog";
 import { Thread } from "./components/assistant-ui/Thread";
 import { ReviewPanel } from "./components/review/ReviewPanel";
@@ -15,6 +16,7 @@ export default function App() {
   const detail = useAppStore((store) => store.connectionDetail);
   const command = useAppStore((store) => store.command);
   const review = useAppStore((store) => store.review);
+  const extensionUiRequest = useAppStore((store) => store.extensionUiRequest);
   const showReview = useAppStore((store) => store.showReview);
   const error = useAppStore((store) => store.lastError);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -59,6 +61,7 @@ export default function App() {
         {review?.visible ? <ReviewPanel /> : <PiRuntimeProvider><Thread /></PiRuntimeProvider>}
       </section>
     </main>
+    {extensionUiRequest && <ExtensionUiDialog request={extensionUiRequest} />}
     {settingsOpen && <HostSettingsDialog onClose={() => setSettingsOpen(false)} />}
     <Toaster richColors position="bottom-right" theme={dark ? "dark" : "light"} />
   </div>;
