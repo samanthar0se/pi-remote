@@ -1,6 +1,7 @@
 import { createServer, type Server as HttpServer } from "node:http";
 import { PROTOCOL_VERSION, clientMessageSchema, serverMessageSchema, type ServerMessage } from "@pi-tin/protocol";
 import { WebSocket, WebSocketServer } from "ws";
+import { BUILD_REVISION } from "./build-info.ts";
 import type { HostBackend } from "./types.ts";
 
 export class HostWebSocketServer {
@@ -20,7 +21,9 @@ export class HostWebSocketServer {
         res.writeHead(401, { "Content-Type": "application/json" }).end(JSON.stringify({ error: "Unauthorized" }));
         return;
       }
-      res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify({ ok: true, version: PROTOCOL_VERSION }));
+      res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" }).end(JSON.stringify({
+        ok: true, version: PROTOCOL_VERSION, revision: BUILD_REVISION,
+      }));
     });
     this.wss = new WebSocketServer({ server: this.http });
     this.wss.on("connection", (socket) => this.accept(socket));

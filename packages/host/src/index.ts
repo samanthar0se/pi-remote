@@ -1,6 +1,7 @@
 import { watchFile, unwatchFile } from "node:fs";
 import { HostController } from "./controller.ts";
 import { HostWebSocketServer } from "./websocket-server.ts";
+import { BUILD_REVISION } from "./build-info.ts";
 
 const host = process.env.PI_TIN_HOST || process.env.PI_REMOTE_HOST || "0.0.0.0";
 const port = Number(process.env.PI_TIN_PORT || process.env.PI_REMOTE_PORT || 31415);
@@ -9,7 +10,7 @@ const server = new HostWebSocketServer(controller, host, port);
 
 await controller.start();
 await server.start();
-console.log(`[pi-tin] Host ready on ws://${host}:${port}`);
+console.log(`[pi-tin] Host ${BUILD_REVISION} ready on ws://${host}:${port}`);
 console.log(`[pi-tin] Token: ${controller.tokenStore.get()}`);
 
 const tokenPath = controller.tokenStore.path;

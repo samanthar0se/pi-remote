@@ -3,6 +3,7 @@
   "private": true,
   "packageManager": "pnpm@10.14.0",
   "scripts": {
+    "deploy:host": "node ./deploy-host.mjs",
     "dev": "corepack pnpm --filter @pi-tin/desktop dev",
     "tauri": "corepack pnpm --filter @pi-tin/desktop tauri",
     "build": "corepack pnpm -r build",

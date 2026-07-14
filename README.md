@@ -26,9 +26,9 @@ On Windows PowerShell, the same command is:
 node .\build-host.mjs
 ```
 
-The builder installs dependencies, runs focused validation, bundles the foreground host controller, installs the small `/pi-tin` settings extension, and installs/updates Plannotator.
+The builder installs dependencies, runs focused validation, bundles the foreground host controller, installs the small `/pi-tin` settings extension, and installs/updates Plannotator. Build output is published atomically, and the prior complete host and extension bundles are retained for rollback.
 
-Re-run it after `git pull`, then start remote control from the repository root:
+After the initial build, start remote control from the repository root:
 
 ```bash
 export PI_TIN_HOST=0.0.0.0
@@ -42,6 +42,54 @@ The controller prints its cryptographically random token at startup and persists
 Upgrading from Pi Remote automatically migrates the existing host token and session state. The `PI_REMOTE_HOST`, `PI_REMOTE_PORT`, and `PI_REMOTE_CWD` variables remain supported as fallbacks; prefer the new `PI_TIN_*` names.
 
 Run `/pi-tin` in a normal Pi TUI to display or rotate the shared token. Rotation disconnects authenticated desktop clients. Use `--skip-tests` for a quick host rebuild or `--skip-plannotator` to leave Plannotator unchanged.
+
+## Deploy host updates
+
+Commit and push completed changes from the development machine. On the host, leave the current foreground controller running and open a second terminal in the repository. Stage the update with:
+
+```bash
+node ./deploy-host.mjs
+```
+
+The guarded deployer:
+
+- refuses local tracked edits or unpushed commits;
+- fetches the configured upstream and permits only a fast-forward update;
+- re-executes itself from the fetched revision before continuing;
+- runs the canonical tests, type checks, bundles, extension installation, and Plannotator update;
+- publishes bundles atomically and retains the prior complete artifacts;
+- never stops the running foreground host.
+
+If staging fails, **do not restart the host**. The loaded host continues serving its previous version; fix the reported problem and rerun `node ./deploy-host.mjs`. Do not use `--skip-tests` for a deployment. Use `--skip-plannotator` only when intentionally leaving that dependency unchanged. If the revision is already staged, the deployer preserves rollback artifacts; pass `--rebuild` only when a full rebuild is required.
+
+After a successful stage:
+
+1. In the original host terminal, press `Ctrl+C` and wait for a clean exit.
+2. Start the staged release with `node ./start-host.mjs`.
+3. In the second terminal, verify the authenticated health endpoint and exact revision:
+
+```bash
+node ./verify-host.mjs --wait 30
+```
+
+The verifier reads the local token and staged release manifest, then rejects an unexpected Git revision or protocol version. A desktop protocol mismatch means the desktop app must be updated before reconnecting.
+
+### Roll back the host
+
+If the new host does not start or fails its smoke check, stop it before changing artifacts. Restore the prior complete host and extension bundles without rewriting Git history:
+
+```bash
+node ./rollback-host.mjs
+node ./start-host.mjs
+```
+
+In another terminal, verify the restored revision:
+
+```bash
+node ./verify-host.mjs --wait 30
+```
+
+Rollback artifacts contain only the immediately preceding complete build. Do not run repeated forced rebuilds before deciding whether to roll back. On the first deployment of this procedure, a restored legacy bundle may predate revision-aware health checks; the rollback command identifies that case and requires a manual connection/session check.
 
 Allow only your local subnet through the firewall. Example with UFW:
 
@@ -160,6 +208,7 @@ Native bundle output is written below `apps/desktop/src-tauri/target/release/bun
 Use a Windows client and a second LAN machine running Pi:
 
 - connect and receive the current session snapshot;
+- stage a host deploy while the old process remains available, restart it, and verify the reported revision;
 - create sessions for two different working directories, run both simultaneously, and switch tabs while they stream;
 - restart the host and verify all open session tabs and transcripts return;
 - close an idle session and verify its native Pi transcript remains on the host;
