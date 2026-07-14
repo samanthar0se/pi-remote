@@ -103,6 +103,14 @@ main { min-width: 0; min-height: 0; height: 100%; display: flex; flex-direction:
 .reasoning summary::-webkit-details-marker { display: none; }
 .reasoning summary em { font-size: 11px; font-style: normal; font-weight: 400; opacity: .65; }
 .reasoning summary .rotate { transform: rotate(180deg); }
+.thinking-shimmer {
+  color: transparent;
+  background: linear-gradient(90deg, var(--text) 0 40%, color-mix(in srgb, var(--bg) 90%, var(--text)) 50%, var(--text) 60% 100%);
+  background-size: 500% 100%;
+  background-clip: text;
+  font-weight: 700;
+  animation: thinking-shimmer 2s linear infinite;
+}
 .task-activity.error summary { color: var(--danger); }
 .task-activity-content { margin: 7px 0 0 8px; padding-left: 12px; border-left: 2px solid var(--line); line-height: 1.55; }
 .reasoning-text { margin: 0 0 10px; white-space: pre-wrap; }
@@ -214,6 +222,10 @@ main { min-width: 0; min-height: 0; height: 100%; display: flex; flex-direction:
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes pulse { 50% { opacity: .4; } }
 @keyframes dot { 0%, 60%, 100% { opacity: .25; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-2px); } }
+@keyframes thinking-shimmer { from { background-position: 100% 0; } to { background-position: -25% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .thinking-shimmer { color: var(--text); background: none; animation: none; }
+}
 @media (max-width: 900px) {
   .topbar { grid-template-columns: auto minmax(90px, 1fr) auto; padding-inline: 12px; }
   .product-mark strong { display: none; }

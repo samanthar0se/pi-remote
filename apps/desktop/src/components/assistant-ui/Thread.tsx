@@ -66,13 +66,14 @@ function groupTaskParts(parts: readonly any[]) {
 function TaskActivity({ groupKey, indices, children }: { groupKey: string | undefined; indices: number[]; children?: ReactNode }) {
   const [open, setOpen] = useState(false);
   const parts = useAssistantState((state) => state.message.parts);
+  const messageRunning = useAssistantState((state) => state.message.status?.type === "running");
   if (!groupKey) return <>{children}</>;
   const tools = indices.map((index) => parts[index]).filter((part) => part?.type === "tool-call");
-  const running = tools.some((part) => part?.type === "tool-call" && part.result === undefined);
+  const running = messageRunning || tools.some((part) => part?.type === "tool-call" && part.result === undefined);
   const failed = tools.some((part) => part?.type === "tool-call" && part.isError);
   const detail = tools.length ? `${tools.length} action${tools.length === 1 ? "" : "s"}` : "reasoning";
   return <details className={`reasoning task-activity ${failed ? "error" : ""}`} open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
-    <summary>{running && <LoaderCircle className="spin" size={14} />}<span>Thinking</span><em>{running ? "Working" : detail}</em><ChevronDown className={open ? "rotate" : ""} size={14} /></summary>
+    <summary>{running && <LoaderCircle className="spin" size={14} />}<span className={running ? "thinking-shimmer" : undefined}>Thinking</span><em>{running ? "Working" : detail}</em><ChevronDown className={open ? "rotate" : ""} size={14} /></summary>
     <div className="task-activity-content">{children}</div>
   </details>;
 }
