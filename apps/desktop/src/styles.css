@@ -115,9 +115,15 @@ main { min-width: 0; min-height: 0; height: 100%; display: flex; flex-direction:
 .markdown > *:first-child { margin-top: 0 !important; }
 .markdown > *:last-child { margin-bottom: 0 !important; }
 .markdown p { margin: 0 0 1em; }
+.markdown ul, .markdown ol { margin: .55em 0 1em; padding-left: 1.4em; }
+.markdown ul { list-style: disc; }
+.markdown ol { list-style: decimal; }
+.markdown li { margin: .35em 0; padding-left: .15em; }
+.markdown li::marker { color: var(--muted); }
+.markdown li > p { margin: 0; }
 .markdown pre { overflow: auto; border: 1px solid var(--line); background: var(--panel) !important; border-radius: 13px; padding: 14px !important; font-size: 12px; }
 .markdown pre, .markdown code { font-family: var(--font-mono); }
-.markdown code:not(pre code) { background: var(--panel); border-radius: 5px; padding: 2px 5px; font-size: .9em; }
+.markdown code:not(pre code) { padding: 0; background: transparent; font-size: .9em; }
 .markdown a { color: var(--work); }
 .markdown table { display: block; overflow: auto; border-collapse: collapse; }
 .markdown th, .markdown td { border: 1px solid var(--line); padding: 6px 10px; }
