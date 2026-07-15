@@ -12,6 +12,7 @@ export type SessionState = {
   commands: SlashCommand[];
   thinkingLevel: string;
   isRunning: boolean;
+  operation: "idle" | "agent" | "compacting";
   contextUsage: ContextUsage | null;
   planPhase: "idle" | "planning" | "executing" | "reviewing";
   activeAssistantPartStart: number | null;
@@ -20,7 +21,7 @@ export type SessionState = {
 
 export const emptySession: SessionState = {
   messages: [], sessionFile: null, sessionName: null, cwd: "", model: null,
-  availableModels: [], commands: [], thinkingLevel: "off", isRunning: false, contextUsage: null, planPhase: "idle",
+  availableModels: [], commands: [], thinkingLevel: "off", isRunning: false, operation: "idle", contextUsage: null, planPhase: "idle",
   activeAssistantPartStart: null, activeTurnStartedAtMs: null,
 };
 
@@ -133,7 +134,7 @@ export function replaceFromSnapshot(snapshot: Snapshot): SessionState {
     messages: normalizeEntries(snapshot.entries), sessionFile: snapshot.sessionFile,
     sessionName: snapshot.sessionName, cwd: snapshot.cwd, model: snapshot.model,
     availableModels: [...snapshot.availableModels], commands: [...snapshot.commands], thinkingLevel: snapshot.thinkingLevel,
-    isRunning: snapshot.isRunning, contextUsage: snapshot.contextUsage, planPhase: snapshot.planPhase,
+    isRunning: snapshot.isRunning, operation: snapshot.isRunning ? "agent" : "idle", contextUsage: snapshot.contextUsage, planPhase: snapshot.planPhase,
     activeAssistantPartStart: null, activeTurnStartedAtMs: null,
   };
 }
@@ -154,9 +155,9 @@ function updateLastAssistant(messages: UiMessage[], updater: (message: UiMessage
 export function reducePiEvent(state: SessionState, rawEvent: unknown): SessionState {
   const event = asObject(rawEvent);
   switch (event.type) {
-    case "agent_start": return { ...state, isRunning: true, activeTurnStartedAtMs: timestampMs(event.timestamp) ?? Date.now() };
+    case "agent_start": return { ...state, isRunning: true, operation: "agent", activeTurnStartedAtMs: timestampMs(event.timestamp) ?? Date.now() };
     case "agent_end":
-    case "agent_settled": return { ...state, isRunning: false, activeTurnStartedAtMs: null };
+    case "agent_settled": return { ...state, isRunning: false, operation: "idle", activeTurnStartedAtMs: null };
     case "message_start": {
       const msg = asObject(event.message);
       if (msg.role !== "assistant" && msg.role !== "user") return state;
@@ -232,9 +233,12 @@ export function reducePiEvent(state: SessionState, rawEvent: unknown): SessionSt
     case "context_usage": return { ...state, contextUsage: event.contextUsage ?? null };
     case "plan_phase": return { ...state, planPhase: event.phase };
     case "session_before_compact":
-    case "compaction_start": return { ...state, isRunning: true };
+    case "compaction_start": return { ...state, isRunning: true, operation: "compacting" };
     case "session_compact":
-    case "compaction_end": return { ...state, isRunning: false };
+    case "compaction_end": {
+      const agentRunning = state.activeTurnStartedAtMs !== null;
+      return { ...state, isRunning: agentRunning, operation: agentRunning ? "agent" : "idle" };
+    }
     default: return state;
   }
 }

@@ -72,6 +72,21 @@ describe("Pi state reduction", () => {
     expect(state.contextUsage).toEqual(contextUsage);
   });
 
+  it("exposes manual and nested compaction progress", () => {
+    let state = reducePiEvent(emptySession, { type: "compaction_start" });
+    expect(state).toMatchObject({ isRunning: true, operation: "compacting" });
+    state = reducePiEvent(state, { type: "compaction_end" });
+    expect(state).toMatchObject({ isRunning: false, operation: "idle" });
+
+    state = reducePiEvent(emptySession, { type: "agent_start", timestamp: "2026-07-14T12:00:00.000Z" });
+    state = reducePiEvent(state, { type: "session_before_compact" });
+    expect(state).toMatchObject({ isRunning: true, operation: "compacting" });
+    state = reducePiEvent(state, { type: "session_compact" });
+    expect(state).toMatchObject({ isRunning: true, operation: "agent" });
+    state = reducePiEvent(state, { type: "agent_settled" });
+    expect(state).toMatchObject({ isRunning: false, operation: "idle" });
+  });
+
   it("preserves user image content for display", () => {
     const state = replaceFromSnapshot({
       ...snapshot("image", "ignored"),

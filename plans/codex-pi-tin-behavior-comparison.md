@@ -39,7 +39,7 @@ Codex completed in `1m 52s`. Pi completed in `1m 42s`. Neither modified reposito
 - Pi Tin exposes `Retry Pi` in the main header for an errored selected runtime and enables retry from Connection Settings.
 - Restart requests use a two-minute desktop deadline to accommodate slow Windows process startup.
 - Compact topbar actions use explicit label spans, producing clean icon-only controls instead of clipped text.
-- The composer now discovers and executes `/compact`, including optional custom compaction instructions, instead of depending on RPC command discovery for Pi built-ins.
+- The composer now discovers and executes `/compact`, including optional custom compaction instructions, and shows a dedicated live status while Pi summarizes the session.
 
 ## Remaining Reliability Findings
 

@@ -9,7 +9,7 @@ import {
   useAssistantState,
   type ImageMessagePartProps,
 } from "@assistant-ui/react";
-import { ArrowDown, ArrowUp, Brain, Check, ChevronDown, Copy, Paperclip, Sparkles, Square, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Brain, Check, ChevronDown, Copy, LoaderCircle, Paperclip, Sparkles, Square, X } from "lucide-react";
 import type { ImageInput, SlashCommand } from "@pi-tin/protocol";
 import { toast } from "sonner";
 import { MarkdownText } from "./MarkdownText";
@@ -292,6 +292,7 @@ function Composer({ fixtureConnected }: { fixtureConnected: boolean }) {
   const storeConnected = useAppStore((s) => s.connectionState === "connected");
   const connected = fixtureConnected || storeConnected;
   const running = useAssistantState((s) => s.thread.isRunning);
+  const operation = useAppStore((s) => s.session.operation);
   const command = useAppStore((s) => s.command);
   const slashCommands = useAppStore((s) => s.session.commands);
   const [guidance, setGuidance] = useState("");
@@ -299,6 +300,12 @@ function Composer({ fixtureConnected }: { fixtureConnected: boolean }) {
   const [delivery, setDelivery] = useState<"steer" | "follow_up">("steer");
   const [stopping, setStopping] = useState(false);
   const guidanceFileInput = useRef<HTMLInputElement>(null);
+  if (operation === "compacting") {
+    return <div className="composer compacting-composer" role="status" aria-live="polite" aria-busy="true">
+      <LoaderCircle className="spin" size={18} />
+      <div><strong>Compacting context…</strong><span>Pi is summarizing this session. The composer will return when it finishes.</span></div>
+    </div>;
+  }
   if (running) {
     const sendGuidance = () => {
       const message = guidance.trim();
