@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ClipboardEvent as ReactClipboardEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent as ReactClipboardEvent } from "react";
 import {
   ActionBarPrimitive,
   AttachmentPrimitive,
@@ -18,9 +18,34 @@ import { createTurnRenderModel, formatWorkedDuration, formatWorkText, type WorkI
 import { useAppStore } from "../../remote/store";
 import { clientSlashCommands, type ClientSlashCommand } from "../../runtime/client-slash-commands";
 
+type ThreadScrollPosition = { scrollTop: number; isAtBottom: boolean };
+const threadScrollPositions = new Map<string, ThreadScrollPosition>();
+
 export function Thread({ fixtureConnected = false }: { fixtureConnected?: boolean }) {
+  const sessionId = useAppStore((state) => state.activeSessionId);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current;
+    if (!sessionId || !viewport) return;
+    const saved = threadScrollPositions.get(sessionId);
+    const maxScrollTop = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
+    const scrollTop = saved?.isAtBottom === false ? Math.min(saved.scrollTop, maxScrollTop) : maxScrollTop;
+    if (scrollTop < maxScrollTop) {
+      viewport.scrollTop = Math.min(scrollTop + 1, maxScrollTop);
+      viewport.dispatchEvent(new Event("scroll"));
+    }
+    viewport.scrollTop = scrollTop;
+    viewport.dispatchEvent(new Event("scroll"));
+    return () => {
+      threadScrollPositions.set(sessionId, {
+        scrollTop: viewport.scrollTop,
+        isAtBottom: Math.abs(viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight) < 1,
+      });
+    };
+  }, [sessionId]);
+
   return <ThreadPrimitive.Root className="thread-root">
-    <ThreadPrimitive.Viewport className="thread-viewport">
+    <ThreadPrimitive.Viewport ref={viewportRef} className="thread-viewport" scrollToBottomOnInitialize={false} scrollToBottomOnThreadSwitch={false}>
       <div className="thread-content">
         <ThreadPrimitive.Empty><Welcome fixtureConnected={fixtureConnected} /></ThreadPrimitive.Empty>
         <ThreadPrimitive.Messages components={{ Message: ThreadMessage }} />
