@@ -1,9 +1,10 @@
 import { useEffect, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { SessionDescriptor } from "@pi-tin/protocol";
-import { Archive, CheckCircle2, CircleAlert, Code2, FilePlus2, LoaderCircle, MessageCircleQuestion, Moon, RotateCcw, Settings, Sun, Unplug, X, Zap } from "lucide-react";
+import { Archive, CheckCircle2, CircleAlert, Code2, FilePlus2, Keyboard, LoaderCircle, MessageCircleQuestion, Moon, RotateCcw, Settings, Sun, Unplug, X, Zap } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { ExtensionUiDialog } from "./components/ExtensionUiDialog";
 import { HostSettingsDialog } from "./components/HostSettingsDialog";
+import { KeyboardShortcutsDialog } from "./components/KeyboardShortcutsDialog";
 import { NewSessionDialog } from "./components/NewSessionDialog";
 import { ChatFixture } from "./components/assistant-ui/ChatFixture";
 import { Thread } from "./components/assistant-ui/Thread";
@@ -38,12 +39,14 @@ function sessionTabId(sessionId: string): string {
 
 function SessionTab({
   item,
+  shortcutNumber,
   selected,
   onSelect,
   onClose,
   onNavigate,
 }: {
   item: SessionDescriptor;
+  shortcutNumber: number;
   selected: boolean;
   onSelect: (sessionId: string) => void;
   onClose: (sessionId: string, label: string) => void;
@@ -62,13 +65,14 @@ function SessionTab({
   const attentionText = attentionLabel(attention);
   const runtimeText = item.isRunning ? "Working" : item.rpcStatus === "ready" ? "Ready" : item.rpcStatus === "starting" ? "Starting" : item.rpcStatus === "error" ? "Runtime failed" : "Stopped";
 
-  return <div className={`session-tab ${selected ? "active" : ""} ${attention ? `attention-${attention}` : ""}`} title={item.cwd} role="presentation">
+  return <div className={`session-tab ${selected ? "active" : ""} ${attention ? `attention-${attention}` : ""}`} title={`${item.cwd} · Alt+${shortcutNumber}`} role="presentation">
     <button
       id={sessionTabId(item.sessionId)}
       className="session-tab-select"
       role="tab"
       aria-controls="session-workspace"
       aria-selected={selected}
+      aria-keyshortcuts={`Alt+${shortcutNumber}`}
       tabIndex={selected ? 0 : -1}
       aria-label={`${label}, ${attentionText || runtimeText}`}
       onClick={() => onSelect(item.sessionId)}
@@ -102,24 +106,59 @@ export default function App() {
   const error = useAppStore((store) => store.lastError);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [newSessionOpen, setNewSessionOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [dark, setDark] = useState(() => matchMedia("(prefers-color-scheme: dark)").matches);
+  const connected = state === "connected";
 
   useEffect(() => { if (!fixtureName) void hydrate().then(() => { if (!useAppStore.getState().profile) setSettingsOpen(true); }); }, [fixtureName, hydrate]);
   useEffect(() => { document.documentElement.classList.toggle("dark", dark); }, [dark]);
   useEffect(() => { if (error) toast.error(error); }, [error]);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (settingsOpen || newSessionOpen || shortcutsOpen) return;
+      const modifier = event.ctrlKey || event.metaKey;
+      if (modifier && event.key === ",") {
+        event.preventDefault();
+        setSettingsOpen(true);
+        return;
+      }
+      if (modifier && event.shiftKey && event.key.toLowerCase() === "o") {
+        event.preventDefault();
+        if (connected && sessions.length < maxSessions) setNewSessionOpen(true);
+        return;
+      }
+      if (event.altKey && /^[1-5]$/.test(event.key)) {
+        const target = sessions[Number(event.key) - 1];
+        if (target) {
+          event.preventDefault();
+          setActiveSession(target.sessionId);
+          requestAnimationFrame(() => document.getElementById(sessionTabId(target.sessionId))?.focus());
+        }
+        return;
+      }
+      const target = event.target as HTMLElement | null;
+      const editing = target?.matches("input, textarea, select, [contenteditable='true']");
+      if (event.key === "?" && !modifier && !event.altKey && !editing) {
+        event.preventDefault();
+        setShortcutsOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [connected, maxSessions, newSessionOpen, sessions, setActiveSession, settingsOpen, shortcutsOpen]);
 
   if (fixtureName) return <ChatFixture name={fixtureName} />;
 
   const run = (label: string, promise: Promise<unknown>) => toast.promise(promise, { loading: label, success: `${label} requested`, error: (caught) => caught.message });
-  const connected = state === "connected";
   const hasActiveSession = Boolean(activeSessionId);
   const sessionReady = connected && hasActiveSession && rpcStatus === "ready";
   const sessionFailed = connected && hasActiveSession && rpcStatus === "error";
   const compacting = session.operation === "compacting";
   const hasGlobalReview = sessions.some((item) => Boolean(item.activeReviewId));
+  const shortcutModifier = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl";
   const newSessionTitle = !connected
     ? "Connect to the Pi host before opening a workspace"
-    : sessions.length >= maxSessions ? `${maxSessions}-workspace limit reached` : "Open workspace";
+    : sessions.length >= maxSessions ? `${maxSessions}-workspace limit reached` : `Open workspace (${shortcutModifier}+Shift+O)`;
   const connectionMessage = state === "connecting" ? "Connecting to Pi…"
     : state === "error" ? detail || "Pi could not connect. Check the host, token, and protocol version."
     : profile ? "Pi is offline. Your transcripts are safe; sending will return when the connection recovers."
@@ -156,21 +195,23 @@ export default function App() {
         <div className="product-mark"><span>π</span><strong>Pi <em>Tin</em></strong></div>
         <div className="session-heading"><strong>{session.sessionName || (hasActiveSession ? "Remote Pi session" : "No open session")}</strong><span title={session.cwd || undefined}>{session.cwd || (profile ? "Open a Pi session to begin" : "Configure the connection in Settings")}</span></div>
         <div className="top-actions">
-          <div className={`connection-pill ${state}`} title={detail}><i />{state}</div>
+          <button className={`connection-pill ${state}`} title={detail || "Open Connection settings"} aria-label={`${state}. Open Connection settings`} onClick={() => setSettingsOpen(true)}><i />{state}</button>
           <button id="open-workspace-button" className="new-action" title={newSessionTitle} disabled={!connected || sessions.length >= maxSessions} onClick={() => setNewSessionOpen(true)}><FilePlus2 size={15} /><span>Open</span></button>
           {sessionFailed && <button className="restart-action" title="Retry the selected Pi runtime" onClick={() => run("Restart Pi", command({ type: "restart_pi" }, 120_000))}><RotateCcw size={15} /><span>Retry Pi</span></button>}
           <button disabled={!sessionReady || hasGlobalReview} title="Toggle plan mode" className={`plan-action ${session.planPhase !== "idle" ? "active-control" : ""}`} onClick={() => run("Plan mode", command({ type: "set_plan_mode", mode: session.planPhase === "idle" ? "enter" : "exit" }))}><Zap size={15} /><span>Plan</span></button>
           <button className="review-action" title="Review changes" disabled={!sessionReady || hasGlobalReview} onClick={() => run("Code review", command({ type: "start_code_review" }))}><Code2 size={15} /><span>Review</span></button>
           <button className="icon-button" disabled={!sessionReady || session.isRunning} onClick={() => run("Compact", command({ type: "compact" }))} title={compacting ? "Compacting context…" : "Compact context"}>{compacting ? <LoaderCircle className="spin" size={16} /> : <Archive size={16} />}</button>
-          <button className="icon-button" onClick={() => setSettingsOpen(true)} title="Connection settings"><Settings size={16} /></button>
+          <button className="icon-button" onClick={() => setShortcutsOpen(true)} title="Keyboard shortcuts (?)"><Keyboard size={16} /></button>
+          <button className="icon-button" onClick={() => setSettingsOpen(true)} title={`Connection settings (${shortcutModifier}+,)`}><Settings size={16} /></button>
           <button className="icon-button" onClick={() => setDark((value) => !value)} title="Toggle theme">{dark ? <Sun size={16} /> : <Moon size={16} />}</button>
         </div>
       </header>
       {state !== "connected" && <div className={`offline-banner ${state}`} role="status"><Unplug size={15} /><span>{connectionMessage}</span>{state === "error" && <button onClick={() => setSettingsOpen(true)}>Connection settings</button>}</div>}
       {connected && sessions.length > 0 && <nav className="session-tabs" aria-label="Open Pi sessions" role="tablist">
-        {sessions.map((item) => <SessionTab
+        {sessions.map((item, index) => <SessionTab
           key={item.sessionId}
           item={item}
+          shortcutNumber={index + 1}
           selected={activeSessionId === item.sessionId}
           onSelect={setActiveSession}
           onClose={(sessionId, label) => void close(sessionId, label)}
@@ -188,6 +229,7 @@ export default function App() {
     {extensionUiRequest && <ExtensionUiDialog request={extensionUiRequest} />}
     {newSessionOpen && <NewSessionDialog onClose={() => setNewSessionOpen(false)} />}
     {settingsOpen && <HostSettingsDialog onClose={() => setSettingsOpen(false)} />}
+    {shortcutsOpen && <KeyboardShortcutsDialog onClose={() => setShortcutsOpen(false)} />}
     <Toaster richColors position="bottom-right" theme={dark ? "dark" : "light"} />
   </div>;
 }

@@ -85,7 +85,8 @@ main { min-width: 0; min-height: 0; height: 100%; display: flex; flex-direction:
 .top-actions .active-control { background: #e8f3ff; color: #0969c8; }
 :root.dark .top-actions .active-control { background: #173b5e; color: #8ac5ff; }
 .icon-button, .message-actions button { width: 34px; height: 34px; padding: 0 !important; border: 0; border-radius: 9px; display: grid !important; place-items: center; background: transparent; cursor: pointer; }
-.connection-pill { margin-right: 7px; display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; text-transform: capitalize; white-space: nowrap; }
+.connection-pill { margin-right: 4px; padding: 5px 7px; display: flex; align-items: center; gap: 6px; border: 0; border-radius: 8px; color: var(--muted); background: transparent; cursor: pointer; font-size: 11px; text-transform: capitalize; white-space: nowrap; }
+.connection-pill:hover { color: var(--text); background: var(--panel); }
 .connection-pill i { width: 7px; height: 7px; border-radius: 50%; background: #aaa; }
 .connection-pill.connected i { background: #22a06b; }
 .connection-pill.connecting i { background: #d59b35; animation: pulse 1s infinite; }
@@ -371,7 +372,7 @@ main { min-width: 0; min-height: 0; height: 100%; display: flex; flex-direction:
 .extension-ui-dialog footer button:hover:not(:disabled) { background: color-mix(in srgb, var(--text) 5%, transparent); }
 .extension-ui-dialog footer .primary { border-color: var(--accent); background: var(--accent); color: var(--accent-text); }
 .extension-ui-dialog button:disabled { opacity: .45; cursor: not-allowed; }
-.profile-dialog { width: min(480px, calc(100vw - 32px)); padding: 22px; border: 1px solid var(--line); border-radius: 20px; background: var(--bg); box-shadow: 0 24px 90px #0004; }
+.profile-dialog { width: min(500px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 22px; overflow-y: auto; border: 1px solid var(--line); border-radius: 20px; background: var(--bg); box-shadow: 0 24px 90px #0004; }
 .profile-dialog header, .profile-dialog footer { display: flex; align-items: center; gap: 8px; }
 .profile-dialog header { margin-bottom: 22px; }
 .profile-dialog header strong { flex: 1; font-size: 18px; letter-spacing: -.02em; }
@@ -379,8 +380,20 @@ main { min-width: 0; min-height: 0; height: 100%; display: flex; flex-direction:
 .profile-dialog header button:hover { background: var(--panel); }
 .profile-dialog label { margin-bottom: 14px; display: flex; flex-direction: column; gap: 6px; color: var(--muted); font-size: 11px; }
 .profile-dialog input, .profile-dialog select { height: 40px; padding: 0 11px; border: 1px solid var(--line); border-radius: 10px; color: var(--text); background: var(--panel); }
+.profile-dialog input:disabled { opacity: .62; cursor: wait; }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .profile-dialog p { color: var(--muted); font-size: 10px; line-height: 1.5; }
+.connection-summary { margin: -5px 0 18px; padding: 12px; display: flex; align-items: center; gap: 11px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.connection-summary-icon { width: 34px; height: 34px; display: grid; flex: none; place-items: center; border-radius: 10px; color: var(--work); background: color-mix(in srgb, var(--work) 11%, transparent); }
+.connection-summary > div { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.connection-summary strong { font-size: 12px; }
+.connection-summary > div > span { color: var(--muted); font-size: 10px; line-height: 1.45; }
+.connection-summary.connected .connection-summary-icon { color: #16845b; background: color-mix(in srgb, #22a06b 13%, transparent); }
+.connection-summary.error .connection-summary-icon, .connection-summary.offline .connection-summary-icon { color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); }
+.verification-result { margin: 13px 0 -3px; padding: 9px 11px; display: flex; align-items: center; gap: 8px; border: 1px solid color-mix(in srgb, #22a06b 26%, var(--line)); border-radius: 10px; color: #16845b; background: color-mix(in srgb, #22a06b 8%, transparent); }
+:root.dark .verification-result { color: #65c69f; }
+.verification-result > span { display: flex; flex-direction: column; gap: 1px; color: var(--muted); font-size: 10px; }
+.verification-result strong { color: inherit; font-size: 11px; }
 .host-control { margin-top: 18px; padding: 12px; display: flex; align-items: center; gap: 16px; border: 1px solid var(--line); border-radius: 11px; background: var(--panel); }
 .host-control > div { min-width: 0; display: flex; flex: 1; flex-direction: column; gap: 3px; }
 .host-control strong { font-size: 11px; }
@@ -390,12 +403,26 @@ main { min-width: 0; min-height: 0; height: 100%; display: flex; flex-direction:
 .host-control button:disabled { opacity: .45; cursor: not-allowed; }
 .profile-dialog .build-revision { margin: 16px 0 -8px; font-family: var(--font-mono); opacity: .7; }
 .profile-dialog .session-dialog-error { margin: 14px 0 -6px; color: var(--danger); font-size: 11px; }
-.profile-dialog footer { margin-top: 22px; }
+.profile-dialog footer { margin-top: 22px; flex-wrap: wrap; }
 .profile-dialog footer span { flex: 1; }
 .profile-dialog footer button { padding: 8px 13px; display: flex; align-items: center; gap: 5px; border: 1px solid var(--line); border-radius: 9px; background: var(--bg); cursor: pointer; font-size: 11px; }
 .profile-dialog footer .primary { border-color: var(--accent); background: var(--accent); color: var(--accent-text); }
 .profile-dialog footer button:disabled { opacity: .45; cursor: not-allowed; }
 .profile-dialog footer .danger { color: var(--danger); }
+.shortcut-dialog { width: min(420px, calc(100vw - 32px)); padding: 21px; border: 1px solid var(--line); border-radius: 18px; background: var(--bg); box-shadow: 0 24px 90px #0004; }
+.shortcut-dialog header { margin-bottom: 17px; display: flex; align-items: center; gap: 10px; }
+.shortcut-title-icon { width: 34px; height: 34px; display: grid; flex: none; place-items: center; border-radius: 10px; color: var(--work); background: color-mix(in srgb, var(--work) 11%, transparent); }
+.shortcut-dialog header > div { min-width: 0; display: flex; flex: 1; flex-direction: column; gap: 2px; }
+.shortcut-dialog header strong { font-size: 15px; }
+.shortcut-dialog header span { color: var(--muted); font-size: 10px; }
+.shortcut-dialog header button { width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: 8px; background: transparent; cursor: pointer; }
+.shortcut-dialog header button:hover { background: var(--panel); }
+.shortcut-list { overflow: hidden; border: 1px solid var(--line); border-radius: 12px; }
+.shortcut-list > div { min-height: 45px; padding: 8px 11px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); }
+.shortcut-list > div:last-child { border-bottom: 0; }
+.shortcut-list > div > span:first-child { flex: 1; color: var(--text); font-size: 11px; }
+.shortcut-list > div > span:last-child { display: flex; align-items: center; gap: 4px; }
+.shortcut-list kbd { min-width: 25px; height: 25px; padding: 0 7px; display: inline-grid; place-items: center; border: 1px solid var(--line-strong); border-bottom-width: 2px; border-radius: 7px; color: var(--text-secondary); background: var(--panel); font: 10px var(--font-mono); }
 
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { PROTOCOL_VERSION } from "@pi-tin/protocol";
-import { PiConnection } from "./connection";
+import { PiConnection, verifyHostProfile } from "./connection";
 
 class FakeSocket {
   static OPEN = 1;
@@ -11,7 +11,8 @@ class FakeSocket {
   onclose: ((e: CloseEvent) => void) | null = null;
   onerror: ((e: Event) => void) | null = null;
   send(value: string) { this.sent.push(value); }
-  close() {}
+  closeCode?: number;
+  close(code?: number) { this.closeCode = code; }
 }
 
 describe("connection auth boundary", () => {
@@ -50,6 +51,52 @@ describe("connection auth boundary", () => {
 
       expect(opens).toBe(1);
       expect(states.at(-1)).toEqual({ state: "error", detail: "Token rotated" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("verifies authentication and host readiness before settings are saved", async () => {
+    const socket = new FakeSocket();
+    const verification = verifyHostProfile(
+      { host: "fe80::1", controlPort: 31415, plannotatorPort: 19432, token: "token" },
+      (url) => {
+        expect(url).toBe("ws://[fe80::1]:31415");
+        return socket as any;
+      },
+    );
+
+    socket.onopen!(new Event("open"));
+    expect(JSON.parse(socket.sent[0]!)).toMatchObject({ type: "auth", version: PROTOCOL_VERSION, token: "token" });
+    socket.onmessage!({ data: JSON.stringify({ type: "session_list", version: PROTOCOL_VERSION, sessions: [], maxSessions: 5 }) } as MessageEvent);
+
+    await expect(verification).resolves.toEqual({ sessionCount: 0, maxSessions: 5 });
+    expect(socket.closeCode).toBe(1000);
+  });
+
+  it("surfaces an authentication failure during verification", async () => {
+    const socket = new FakeSocket();
+    const verification = verifyHostProfile(
+      { host: "10.0.0.2", controlPort: 31415, plannotatorPort: 19432, token: "wrong" },
+      () => socket as any,
+    );
+    socket.onopen!(new Event("open"));
+    socket.onmessage!({ data: JSON.stringify({ type: "error", code: "unauthorized", message: "Authentication failed." }) } as MessageEvent);
+    await expect(verification).rejects.toThrow("Authentication failed");
+  });
+
+  it("times out a host that never completes authentication", async () => {
+    vi.useFakeTimers();
+    try {
+      const socket = new FakeSocket();
+      const verification = verifyHostProfile(
+        { host: "10.0.0.2", controlPort: 31415, plannotatorPort: 19432, token: "token" },
+        () => socket as any,
+        250,
+      );
+      const rejection = expect(verification).rejects.toThrow("did not respond in time");
+      await vi.advanceTimersByTimeAsync(250);
+      await rejection;
     } finally {
       vi.useRealTimers();
     }

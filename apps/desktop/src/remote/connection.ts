@@ -21,6 +21,61 @@ type SocketLike = Pick<WebSocket, "readyState" | "send" | "close"> & {
 
 type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> };
 
+export type HostVerification = { sessionCount: number; maxSessions: number };
+
+function profileWebSocketUrl(profile: HostProfile): string {
+  const host = profile.host.includes(":") && !profile.host.startsWith("[") ? `[${profile.host}]` : profile.host;
+  return `ws://${host}:${profile.controlPort}`;
+}
+
+export function verifyHostProfile(
+  profile: HostProfile,
+  socketFactory: (url: string) => SocketLike = (url) => new WebSocket(url),
+  timeoutMs = 8_000,
+): Promise<HostVerification> {
+  return new Promise((resolve, reject) => {
+    let socket: SocketLike;
+    let settled = false;
+    const finish = (result: { value: HostVerification } | { error: Error }) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try { socket.close(1000, "Connection check complete"); } catch {}
+      if ("value" in result) resolve(result.value);
+      else reject(result.error);
+    };
+    const timer = setTimeout(() => finish({ error: new Error("The Pi host did not respond in time.") }), timeoutMs);
+
+    try {
+      socket = socketFactory(profileWebSocketUrl(profile));
+    } catch (error) {
+      clearTimeout(timer);
+      settled = true;
+      reject(error instanceof Error ? error : new Error("Could not open a connection to the Pi host."));
+      return;
+    }
+    socket.onopen = () => {
+      socket.send(JSON.stringify({ type: "auth", version: PROTOCOL_VERSION, token: profile.token }));
+    };
+    socket.onmessage = (event) => {
+      try {
+        const message = parseServerMessage(JSON.parse(String(event.data)));
+        if (message.type === "session_list") {
+          finish({ value: { sessionCount: message.sessions.length, maxSessions: message.maxSessions } });
+        } else if (message.type === "error") {
+          finish({ error: new Error(message.message) });
+        }
+      } catch {
+        finish({ error: new Error("The Pi host returned an invalid response. Update the host and desktop app together.") });
+      }
+    };
+    socket.onerror = () => finish({ error: new Error("Could not reach the Pi host. Check its address, port, and firewall.") });
+    socket.onclose = (event) => {
+      if (!settled) finish({ error: new Error(event.reason || `The Pi host closed the connection (${event.code}).`) });
+    };
+  });
+}
+
 export class PiConnection {
   private socket: SocketLike | null = null;
   private profile: HostProfile | null = null;
@@ -68,7 +123,7 @@ export class PiConnection {
     if (!this.profile || this.stopped) return;
     const generation = ++this.generation;
     this.hooks.onState("connecting");
-    const socket = this.socketFactory(`ws://${this.profile.host}:${this.profile.controlPort}`);
+    const socket = this.socketFactory(profileWebSocketUrl(this.profile));
     this.socket = socket;
     socket.onopen = () => {
       if (generation !== this.generation || !this.profile) return;

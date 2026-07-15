@@ -118,7 +118,7 @@ New-NetFirewallRule -DisplayName "Pi Tin Plannotator" -Direction Inbound -Action
 
 1. Start `node ./start-host.mjs` on the remote machine and copy the printed token.
 2. Open Connection Settings from the gear in the top toolbar.
-3. Enter the host/IP, `31415`, `19432`, and token, then save and connect.
+3. Enter the host/IP, `31415`, `19432`, and token. **Test connection** diagnoses address, firewall, token, and protocol problems before anything is saved.
 4. Reopen Settings whenever the single connection needs to be changed or removed.
 5. Use **Open** to open another workspace runtime, entering an existing absolute working directory on the Pi host. Opening a directory that is already active switches to its existing runtime.
 
@@ -127,6 +127,7 @@ The token is stored in Tauri Store as local application data, not Windows Creden
 ## Chat and reviews
 
 - Use the compact session tabs to switch between up to five independently running Pi sessions. Closing a tab stops that runtime but keeps its native Pi transcript on the host.
+- Use `Alt+1` through `Alt+5` to jump between workspaces, `Ctrl/⌘+Shift+O` to open one, and `Ctrl/⌘+,` for Connection settings. Press `?` outside the composer for the in-app shortcut guide.
 - **Open** opens another workspace runtime with its own working directory. `/new` starts a fresh transcript inside the selected runtime.
 - Send normally while the selected Pi session is idle. Sending while it runs is delivered as steering guidance.
 - Paste PNG, JPEG, GIF, or WebP images into either composer to preview and send them with a prompt or guidance.
