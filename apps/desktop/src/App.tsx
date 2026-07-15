@@ -85,7 +85,7 @@ export default function App() {
       <section className="workspace">
         {!hasActiveSession
           ? <div className="no-session"><span>π</span><strong>No open Pi sessions</strong><p>Open a working directory on the remote host to start one.</p><button disabled={!connected} onClick={() => setNewSessionOpen(true)}><FilePlus2 size={15} /> New session</button></div>
-          : review?.visible ? <ReviewPanel /> : <PiRuntimeProvider><Thread /></PiRuntimeProvider>}
+          : review?.visible ? <ReviewPanel /> : <PiRuntimeProvider key={activeSessionId}><Thread /></PiRuntimeProvider>}
       </section>
     </main>
     {extensionUiRequest && <ExtensionUiDialog request={extensionUiRequest} />}
