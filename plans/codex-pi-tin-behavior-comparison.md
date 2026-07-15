@@ -31,6 +31,7 @@ Codex completed in `1m 52s`. Pi completed in `1m 42s`. Neither modified reposito
 | Compact header | Actions become clean icon buttons | Text labels clip beside icons around the benchmark width | Hide wrapped labels at compact widths while preserving titles. |
 | Built-in slash commands | Task controls remain discoverable in the composer | RPC discovery omits Pi built-ins, so `/compact` was absent even though the header action existed | Register local `/new` and `/compact` entries and route them to real host commands. |
 | Batched tools | Consecutive shell work may appear as `Ran commands` | Each Pi tool call originally rendered as a separate top-level row | Group consecutive shell calls behind one expandable `Ran commands` row while preserving every ordered command and result inside. |
+| Streaming transcript | Earlier turns remain stable while the latest answer streams | assistant-ui's incremental branch repository could temporarily select a partial branch | Rebuild one exact linear repository from Pi's authoritative message array on every update. |
 
 ## Changes From This Comparison
 
@@ -41,6 +42,7 @@ Codex completed in `1m 52s`. Pi completed in `1m 42s`. Neither modified reposito
 - Compact topbar actions use explicit label spans, producing clean icon-only controls instead of clipped text.
 - The composer now discovers and executes `/compact`, including optional custom compaction instructions, and shows a dedicated live status while Pi summarizes the session.
 - Expanded work transcripts clean raw reasoning markdown, use tighter spacing, and consolidate consecutive shell calls without discarding details.
+- Streaming updates now replace assistant-ui's internal repository with the complete authoritative Pi transcript, preventing temporary branch loss.
 
 ## Remaining Reliability Findings
 

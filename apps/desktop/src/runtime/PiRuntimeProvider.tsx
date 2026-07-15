@@ -1,15 +1,16 @@
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import {
   AssistantRuntimeProvider,
   SimpleImageAttachmentAdapter,
   useExternalStoreRuntime,
   type AppendMessage,
   type AttachmentAdapter,
-  type ThreadMessageLike,
+  type ThreadMessage,
 } from "@assistant-ui/react";
 import type { ImageInput } from "@pi-tin/protocol";
 import { useAppStore } from "../remote/store";
 import { parseClientSlashCommand } from "./client-slash-commands";
+import { createRuntimeMessageRepository } from "./runtime-message-repository";
 
 const simpleImageAdapter = new SimpleImageAttachmentAdapter();
 const imageAttachmentAdapter: AttachmentAdapter = {
@@ -40,11 +41,11 @@ export function PiRuntimeProvider({ children }: { children: ReactNode }) {
   const isRunning = useAppStore((state) => state.session.isRunning);
   const connectionState = useAppStore((state) => state.connectionState);
   const command = useAppStore((state) => state.command);
+  const messageRepository = useMemo(() => createRuntimeMessageRepository(messages), [messages]);
 
-  const runtime = useExternalStoreRuntime({
-    messages,
+  const runtime = useExternalStoreRuntime<ThreadMessage>({
+    messageRepository,
     isRunning,
-    convertMessage: (message): ThreadMessageLike => message,
     adapters: { attachments: imageAttachmentAdapter },
     onNew: async (message: AppendMessage) => {
       if (connectionState !== "connected") throw new Error("Connect to a Pi instance before sending.");
